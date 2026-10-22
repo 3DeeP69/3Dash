@@ -64,12 +64,15 @@ jobs:
         env: { ANDROID_KEYSTORE_B64: "${{ secrets.ANDROID_KEYSTORE_B64 }}" }
         run: |
           if [ -z "$ANDROID_KEYSTORE_B64" ]; then
-            echo "::error::Add the ANDROID_KEYSTORE_B64 secret (the project key). Without it the APK could not update the one already on the Fold."
-            exit 1
+            # without the project key an APK could not update the one already on the Fold: skip, don't fail
+            echo "::warning::ANDROID_KEYSTORE_B64 secret not set, so no APK from CI (attach the locally signed one to the release)."
+            echo "SKIP_APK=1" >> "$GITHUB_ENV"
+            exit 0
           fi
           echo "$ANDROID_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
           echo "TURD_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
       - name: Build APK
+        if: env.SKIP_APK != '1'
         env:
           TURD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           TURD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -82,10 +85,12 @@ jobs:
           npm run android:apk
           cp android/app/build/outputs/apk/release/app-release.apk "TURD-$v-android.apk"
       - uses: actions/upload-artifact@v4
+        if: env.SKIP_APK != '1'
         with: { name: turd-android, path: "turd/packaging/app/TURD-*-android.apk" }
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    # publishes whatever built: the Windows installers are required, the APK is optional
+    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.windows.result == 'success'
     needs: [windows, android]
     runs-on: ubuntu-latest
     permissions: { contents: write }
