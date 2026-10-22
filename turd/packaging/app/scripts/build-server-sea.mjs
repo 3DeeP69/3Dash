@@ -25,7 +25,9 @@ fs.mkdirSync(path.join(work, "app"), { recursive: true });
 for (const f of fs.readdirSync(src)) {
   if (/\.(js|json)$/.test(f) && f !== "package-lock.json") fs.copyFileSync(path.join(src, f), path.join(work, "app", f));
 }
-run("npm", ["install", "--omit=dev", "--no-audit", "--no-fund", "--silent"], { cwd: path.join(work, "app") });
+// Windows npm is npm.cmd, which execFileSync won't find under the bare name "npm"
+const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
+run(NPM, ["install", "--omit=dev", "--no-audit", "--no-fund", "--silent"], { cwd: path.join(work, "app") });
 
 // one CommonJS file: server.js + assistant.js + @anthropic-ai/sdk
 const esbuild = await import("esbuild");
