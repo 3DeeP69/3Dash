@@ -18,7 +18,10 @@ const NODE_VER = process.env.TURD_NODE_VERSION || process.versions.node;   // bl
 const triple = { win: "x86_64-pc-windows-gnu", "win-msvc": "x86_64-pc-windows-msvc", linux: "x86_64-unknown-linux-gnu" }[target];
 if (!triple) { console.error("target must be win, win-msvc or linux"); process.exit(1); }
 const isWin = target.startsWith("win");
-const run = (cmd, args, opt = {}) => execFileSync(cmd, args, { stdio: "inherit", ...opt });
+// Node 18.20+/20.12+/22 refuses to spawn a .cmd (npm.cmd) without a shell (EINVAL),
+// so run .cmd launchers through the shell; plain executables stay direct.
+const run = (cmd, args, opt = {}) =>
+  execFileSync(cmd, args, { stdio: "inherit", shell: cmd.endsWith(".cmd"), ...opt });
 
 fs.rmSync(path.join(work, "app"), { recursive: true, force: true });
 fs.mkdirSync(path.join(work, "app"), { recursive: true });
