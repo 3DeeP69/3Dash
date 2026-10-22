@@ -33,7 +33,7 @@ function demoScan(){
   return base;
 }
 
-export default {
+const NETWATCH = {
   id:"netwatch", icon:"⇄", label:"Network",
   theme:{ accent:"#3fd0ff", accent2:"#2f7bff", rgb:"63,208,255" },
   mount(el, ctx){
@@ -115,6 +115,10 @@ export default {
   unmount(){ stopFades(); stopFades=()=>{}; editMac=null; },
   summary(){ return { title:"Network", value:DEVICES.length||"—", note:"devices" }; },
 };
+export default NETWATCH;
+export function mountNetwatch(el, ctx){ return NETWATCH.mount(el, ctx); }
+export function unmountNetwatch(){ return NETWATCH.unmount && NETWATCH.unmount(); }
+
 /* styles */
 (function(){ if(document.getElementById("netwatch-css")) return;
   const s=document.createElement("style"); s.id="netwatch-css"; s.textContent=`

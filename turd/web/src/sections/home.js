@@ -15,6 +15,7 @@ import projects from "./projects.js";
 import { fetchStats, stripHTML } from "./pcstat.js";
 import { devStripHTML, fetchDevices } from "./devstat.js";   // Fold status via device sync (Device-sync thread)
 import { registerCard, getCard, onCards, getLayout, saveLayout, follows, setFollow, resetLayout } from "./homecards.js";
+import { registerBatteries } from "./btbat.js";              // gadget batteries: only when the native app reports one
 
 const plain = s=> String(s).replace(/\*\*(.+?)\*\*/g,"$1").replace(/`([^`]+)`/g,"$1");
 // Optional community calendar (built by another thread). Missing file → silently skipped.
@@ -188,7 +189,7 @@ function build(){
 }
 function mountCard(id){
   const d=getCard(id); if(!allowed(d) || live.has(id)) return null;
-  const el=document.createElement("section"); el.className=`hm-card hm-k-${d.kind}`; el.dataset.card=id;
+  const el=document.createElement("section"); el.className=`hm-card hm-k-${d.kind}${d.quiet?" hm-quiet":""}`; el.dataset.card=id;
   const body=document.createElement("div"); body.className="hm-body"; el.appendChild(body);
   $("#hmBoard",panel).appendChild(el);
   const c={el, body, handle:null}; live.set(id,c);
@@ -228,7 +229,7 @@ function reflow(){
 const store = ()=> saveLayout(layout);
 
 /* ------------------------------------------------------------ customize mode */
-const visibleIds = ()=> layout.order.filter(id=>live.has(id));
+const visibleIds = ()=> layout.order.filter(id=>live.has(id) && live.get(id).el.getClientRects().length);   // skips quiet cards with nothing to show
 function addOverlay(id){
   const c=live.get(id), d=getCard(id); if(!c || $(".hm-ov",c.el)) return;
   const ov=document.createElement("div"); ov.className="hm-ov"; ov.tabIndex=0; ov.setAttribute("role","button");
@@ -378,6 +379,7 @@ function lift(x,y){ const el=drag.el; el.style.transition="none"; el.style.trans
   el.style.transform=`translate(${x-drag.gx-r.left}px,${y-drag.gy-r.top}px) scale(1.02)`; }
 function onPointerUp(e){
   longPressCancel();
+  if(swallowClick) setTimeout(()=>{ swallowClick=false; },0);   // the click after a long press may land elsewhere or never fire
   if(!drag || e.pointerId!==drag.pid) return;
   const d=drag; drag=null; stopAuto();
   if(!d.on) return;
@@ -446,7 +448,7 @@ export default {
   id:"home", icon:"⌂", label:"Home",
   theme:{ accent:"#2f8cff", accent2:"#0050d0", rgb:"47,140,255", bg:"#020a1c", bg2:"#06173a" },
   mount(el, ctx){ K=kit(ctx); panel=el; stopFades(); stopFades=edgeFades(el); el.classList.add("t-full","t-sec-hm");
-    build(); render();
+    registerBatteries(); build(); render();
     // cards registered later (other threads' modules) appear without a reload
     stopCards(); stopCards=onCards(()=>{ if(!panel) return; layout=getLayout();
       layout.order.forEach(id=>{ if(!layout.hidden.has(id) && !live.has(id)) mountCard(id); }); place(); if(editing) paintTray(); });

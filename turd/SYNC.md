@@ -55,6 +55,7 @@ T.U.R.D. server on your PC. Free, nothing leaves your home network.
 | `turd_cal_view`, `turd_com_pane` | whole value | Calendar view, Community pane |
 | `turd_wake` | whole value | The PC to wake (lets the Fold learn it from the PC) |
 | `turd_devstatus` | whole value | Fold status reporting on/off |
+| `turd_home_layout` | whole value | Shared Home layout (used only when "same layout on all my devices" is on) |
 | `turd_devices` | per field (one per device) | Each device's own status row (battery, storage, last seen) |
 | any new `turd_*` key | whole value | New features sync automatically unless listed below |
 
@@ -69,6 +70,7 @@ T.U.R.D. server on your PC. Free, nothing leaves your home network.
 | `turd_voice_on` | The always-listening "Hey T.U.R.D." mic is a per-device choice (battery on the Fold). |
 | `turd_wx_cache`, `turd_prj_cache`, `turd_prj_status`, `turd_cal_cache`, `turd_pc_last`, `turd_games_last` | Caches that refill themselves. |
 | `turd_cal_events`, `turd_cal_seeded`, `turd_cal_focus` | The calendar already syncs through `/api/events`. |
+| `turd_home_layout_dev`, `turd_home_follow` | Each device's own Home layout and its "same layout on all my devices" switch. |
 | `turd_chat_demo*` | Demo-mode chat. |
 | `turd_as_offline` | Per-device upload queue; syncing it would send answers twice. |
 | `turd_xtr_state`, `turd_xtr_dir`, `turd_xtr_plat` | Downloaded files and folders exist on one device only. |

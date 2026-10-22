@@ -39,6 +39,8 @@
 //                                   the PC learned from the server (localStorage turd_wake)
 //   N.wakeTarget()                  {mac, name, url} | null   the PC that wake() will wake
 //
+//   N.recon.ports({host,ports,timeoutMs}) [{port, open, service}] — TCP scan of a host on your LAN
+//   N.bt.batteries()                [{name, kind:"controller"|"earbuds"|"headset"|"other", level, charging?}]
 //   N.netwatch                      request() / scan() -> [{ip, mac, vendor, hostname, gateway, self}]
 //   N.vendorOf(mac)                 offline OUI vendor lookup
 //   N.device (Android)              status() battery/charging/storage, report() to the PC,
@@ -227,6 +229,20 @@
     scan: function(){ return call("netwatchScan").then(function(r){ return withVendors(items(r)); }); },
     // the same scan plus {devices (= items), subnet, gateway, macs:boolean (false = this OS hides MAC addresses)}
     scanFull: function(){ return call("netwatchScan").then(async function(r){ r.items = await withVendors(items(r)); r.devices = r.items; return r; }); },
+  };
+  // Battery of already-connected Bluetooth gadgets (controller, earbuds, headset). Read-only:
+  // no scan, no pairing, no new permission. Returns [] when nothing reports a level. (Windows reads
+  // the GATT Battery Service; Android reads connected bonded devices, needs BLUETOOTH_CONNECT.)
+  N.bt = { batteries: function(){ return call("btBatteries").then(items); } };
+  // Spy tools recon: bounded TCP connect scan of one host on your own network.
+  // recon.ports({host, ports?[], timeoutMs?}) -> [{port, open:true, service}] (only open ports returned).
+  N.recon = {
+    ports: function(o){
+      o = o || {};
+      return call("portScan", { host: o.host, ports: o.ports, timeoutMs: o.timeoutMs }).then(function(r){
+        return items(r).map(function(x){ return { port: x.port, open: true, service: x.service || "" }; });
+      });
+    },
   };
   N.wakeTarget = function(){ return lsGet("turd_wake"); };
   N.wake = function(mac){

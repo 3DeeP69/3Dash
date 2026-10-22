@@ -39,7 +39,7 @@ function injectCSS() {
   .ch-ro .pip{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);flex:none}
   .ch-ro .rr{margin-left:auto;font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--accent);text-transform:uppercase}
   .ch-ro.admin .rr{color:var(--bad)}
-  .ch-main{display:flex;flex-direction:column;min-height:0;background:rgba(0,0,0,.22);border:1px solid var(--glass-line);border-radius:18px;overflow:hidden}
+  .ch-main{position:relative;display:flex;flex-direction:column;min-height:0;background:rgba(0,0,0,.22);border:1px solid var(--glass-line);border-radius:18px;overflow:hidden}
   .ch-bar{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--glass-line);font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--ink-dim)}
   .ch-bar .st{display:flex;align-items:center;gap:7px}
   .ch-bar .st .pip{width:8px;height:8px;border-radius:50%;background:var(--ink-faint)}

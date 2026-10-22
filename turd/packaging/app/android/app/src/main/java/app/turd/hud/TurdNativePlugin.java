@@ -66,6 +66,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -122,6 +123,52 @@ public class TurdNativePlugin extends Plugin {
         super.handleOnDestroy();
     }
 
+    /* ================================================================ port scan */
+
+    private static final int[] COMMON_PORTS = {21,22,23,25,53,80,110,111,135,139,143,443,445,515,548,554,631,993,995,1883,1900,3000,3306,3389,5000,5353,5432,5900,6379,7000,8000,8009,8080,8443,8787,8883,9000,32400};
+
+    /** Bounded TCP connect scan of one host (Spy tools recon). {host, ports?[], timeoutMs?}. */
+    @PluginMethod
+    public void portScan(PluginCall call) {
+        final String host = call.getString("host", "");
+        if (host.isEmpty()) { call.reject("no host to scan"); return; }
+        final int timeout = Math.max(100, Math.min(2000, call.getInt("timeoutMs", 500)));
+        final List<Integer> ports = new ArrayList<>();
+        JSArray pa = call.getArray("ports", null);
+        try { if (pa != null) for (int i = 0; i < pa.length(); i++) { int p = pa.getInt(i); if (p >= 1 && p <= 65535) ports.add(p); } } catch (Exception ignored) {}
+        if (ports.isEmpty()) for (int p : COMMON_PORTS) ports.add(p);
+        io.execute(() -> {
+            final List<Integer> open = java.util.Collections.synchronizedList(new ArrayList<>());
+            ExecutorService pool = Executors.newFixedThreadPool(16);
+            for (final int port : ports) pool.execute(() -> {
+                try (java.net.Socket sk = new java.net.Socket()) {
+                    sk.connect(new java.net.InetSocketAddress(host, port), timeout);
+                    open.add(port);
+                } catch (Exception ignored) {}
+            });
+            pool.shutdown();
+            try { pool.awaitTermination(60, TimeUnit.SECONDS); } catch (Exception ignored) {}
+            java.util.Collections.sort(open);
+            JSArray items = new JSArray();
+            for (int p : open) { JSObject o = new JSObject(); o.put("port", p); o.put("service", serviceName(p)); items.put(o); }
+            JSObject res = new JSObject();
+            res.put("host", host);
+            res.put("items", items);
+            call.resolve(res);
+        });
+    }
+
+    private static String serviceName(int port) {
+        switch (port) {
+            case 21: return "ftp"; case 22: return "ssh"; case 23: return "telnet"; case 25: return "smtp";
+            case 53: return "dns"; case 80: return "http"; case 110: return "pop3"; case 139: return "netbios";
+            case 143: return "imap"; case 443: return "https"; case 445: return "smb"; case 554: return "rtsp";
+            case 631: return "ipp"; case 993: return "imaps"; case 1883: return "mqtt"; case 3306: return "mysql";
+            case 3389: return "rdp"; case 5432: return "postgres"; case 5900: return "vnc"; case 8080: return "http-proxy";
+            case 8443: return "https-alt"; case 8787: return "turd"; case 32400: return "plex"; default: return "";
+        }
+    }
+
     /* ================================================================ network watch */
 
     @PluginMethod
@@ -146,6 +193,63 @@ public class TurdNativePlugin extends Plugin {
             catch (Exception e) { call.reject(String.valueOf(e.getMessage())); }
         });
     }
+
+    /* ================================================================ bluetooth batteries */
+
+    /** Read-only battery level of ALREADY-CONNECTED Bluetooth devices (controller, earbuds, headset).
+     *  No scan and no new permission: if BLUETOOTH_CONNECT isn't granted we return an empty list. */
+    @PluginMethod
+    public void btBatteries(PluginCall call) {
+        JSArray out = new JSArray();
+        try {
+            if (Build.VERSION.SDK_INT >= 31 && ContextCompat.checkSelfPermission(getContext(), "android.permission.BLUETOOTH_CONNECT") != PackageManager.PERMISSION_GRANTED) {
+                call.resolve(itemsOf(out)); return;
+            }
+            BluetoothManager bm = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+            BluetoothAdapter ad = bm == null ? null : bm.getAdapter();
+            if (ad == null || !ad.isEnabled()) { call.resolve(itemsOf(out)); return; }
+            java.util.Set<BluetoothDevice> bonded = ad.getBondedDevices();
+            if (bonded == null) { call.resolve(itemsOf(out)); return; }
+            java.lang.reflect.Method getLevel = BluetoothDevice.class.getMethod("getBatteryLevel");
+            java.lang.reflect.Method isConn = BluetoothDevice.class.getMethod("isConnected");
+            for (BluetoothDevice d : bonded) {
+                try {
+                    boolean connected = Boolean.TRUE.equals(isConn.invoke(d));
+                    if (!connected) continue;
+                    int lvl = (int) getLevel.invoke(d);            // -1 when the device doesn't report one
+                    if (lvl < 0 || lvl > 100) continue;
+                    JSObject o = new JSObject();
+                    o.put("name", d.getName() == null ? "Bluetooth device" : d.getName());
+                    o.put("kind", btKind(d));
+                    o.put("level", lvl);
+                    out.put(o);
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {}
+        call.resolve(itemsOf(out));
+    }
+
+    private static String btKind(BluetoothDevice d) {
+        try {
+            int cls = d.getBluetoothClass().getDeviceClass();
+            switch (cls) {
+                case android.bluetooth.BluetoothClass.Device.AUDIO_VIDEO_WEARABLE_HEADSET:
+                case android.bluetooth.BluetoothClass.Device.AUDIO_VIDEO_HANDSFREE:
+                    return "headset";
+                case android.bluetooth.BluetoothClass.Device.AUDIO_VIDEO_HEADPHONES:
+                    return "earbuds";
+                case android.bluetooth.BluetoothClass.Device.TOY_CONTROLLER:
+                    return "controller";
+                default:
+                    int major = d.getBluetoothClass().getMajorDeviceClass();
+                    if (major == android.bluetooth.BluetoothClass.Device.Major.AUDIO_VIDEO) return "headset";
+                    if (major == android.bluetooth.BluetoothClass.Device.Major.PERIPHERAL) return "controller";
+                    return "other";
+            }
+        } catch (Exception e) { return "other"; }
+    }
+
+    private static JSObject itemsOf(JSArray a) { JSObject o = new JSObject(); o.put("items", a); return o; }
 
     /* ================================================================ device status */
 

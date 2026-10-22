@@ -23,7 +23,7 @@ function paint(scope, list, ctx){
     : `<p class="t-s rdr-empty">No contacts yet. Run a scan to populate.</p>`;
 }
 
-export default {
+const RADAR = {
   id:"radar", icon:"◎", label:"Radar",
   theme:{ accent:"#ff5ca8", accent2:"#b04cff", rgb:"255,92,168" },
   mount(el, ctx){
@@ -86,6 +86,10 @@ export default {
   unmount(){ stopFades(); stopFades=()=>{}; },
   summary(){ return { title:"Radar", value:DEVICES.length, note:"contacts" }; },
 };
+export default RADAR;
+export function mountRadar(el, ctx){ return RADAR.mount(el, ctx); }
+export function unmountRadar(){ return RADAR.unmount && RADAR.unmount(); }
+
 /* scope styles */
 (function(){ if(document.getElementById("radar-css")) return;
   const s=document.createElement("style"); s.id="radar-css"; s.textContent=`

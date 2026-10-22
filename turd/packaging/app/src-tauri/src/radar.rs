@@ -249,3 +249,137 @@ mod ble {
         Err("Bluetooth scan is implemented for Windows".into())
     }
 }
+
+/* ---------------------------------------------------------------- bluetooth batteries */
+// Read-only battery level of already-paired Bluetooth devices (controller, earbuds, headset)
+// via the GATT Battery Service (0x180F / characteristic 0x2A19). No scan, no pairing, no prompt.
+
+#[tauri::command]
+pub async fn nat_bt_batteries(a: Value) -> Res {
+    let _ = a;
+    tokio::task::spawn_blocking(|| bt::batteries().unwrap_or_default())
+        .await
+        .map_err(|e| e.to_string())
+        .map(|items| json!({ "items": items }))
+}
+
+#[cfg(windows)]
+mod bt {
+    use serde_json::{json, Value};
+    use windows::Devices::Bluetooth::GenericAttributeProfile::{GattCharacteristicProperties, GattCommunicationStatus};
+    use windows::Devices::Bluetooth::{BluetoothCacheMode, BluetoothConnectionStatus, BluetoothLEDevice};
+    use windows::Devices::Enumeration::DeviceInformation;
+    use windows::Storage::Streams::DataReader;
+
+    const BATTERY_SERVICE: u16 = 0x180F;
+    const BATTERY_LEVEL: u16 = 0x2A19;
+
+    fn kind_of(name: &str, appearance: u16) -> &'static str {
+        // GATT "appearance" categories (0x03C1 = HID gamepad, 0x0940s = audio), else name hints
+        let a = appearance >> 6;
+        match a {
+            0x0F => "controller",        // generic HID
+            0x25 => "earbuds",           // earbuds
+            0x24 | 0x23 => "headset",    // headset / headphones
+            _ => {
+                let n = name.to_ascii_lowercase();
+                if n.contains("controller") || n.contains("gamepad") || n.contains("xbox") || n.contains("dualsense") || n.contains("dualshock") {
+                    "controller"
+                } else if n.contains("buds") || n.contains("airpods") || n.contains("earbud") {
+                    "earbuds"
+                } else if n.contains("headset") || n.contains("headphone") || n.contains("headphones") {
+                    "headset"
+                } else {
+                    "other"
+                }
+            }
+        }
+    }
+
+    fn level_for(id: &windows::core::HSTRING) -> Option<(String, &'static str, u8)> {
+        unsafe {
+            let dev = BluetoothLEDevice::FromIdAsync(id).ok()?.join().ok()?;
+            if dev.ConnectionStatus().ok()? != BluetoothConnectionStatus::Connected {
+                return None; // only devices that are actually connected right now
+            }
+            let name = dev.Name().map(|s| s.to_string()).unwrap_or_default();
+            let appearance = dev.Appearance().ok().and_then(|ap| ap.RawValue().ok()).unwrap_or(0);
+            let services = dev
+                .GetGattServicesForUuidWithCacheModeAsync(uuid16(BATTERY_SERVICE), BluetoothCacheMode::Cached)
+                .ok()?
+                .join()
+                .ok()?;
+            if services.Status().ok()? != GattCommunicationStatus::Success {
+                return None;
+            }
+            for svc in services.Services().ok()? {
+                let chars = svc
+                    .GetCharacteristicsForUuidWithCacheModeAsync(uuid16(BATTERY_LEVEL), BluetoothCacheMode::Uncached)
+                    .ok()?
+                    .join()
+                    .ok()?;
+                if chars.Status().ok()? != GattCommunicationStatus::Success {
+                    continue;
+                }
+                for ch in chars.Characteristics().ok()? {
+                    let props = ch.CharacteristicProperties().ok()?;
+                    if (props & GattCharacteristicProperties::Read) == GattCharacteristicProperties(0) {
+                        continue;
+                    }
+                    let res = ch.ReadValueWithCacheModeAsync(BluetoothCacheMode::Uncached).ok()?.join().ok()?;
+                    if res.Status().ok()? != GattCommunicationStatus::Success {
+                        continue;
+                    }
+                    let buf = res.Value().ok()?;
+                    let reader = DataReader::FromBuffer(&buf).ok()?;
+                    if reader.UnconsumedBufferLength().ok()? >= 1 {
+                        let lvl = reader.ReadByte().ok()?;
+                        if lvl <= 100 {
+                            return Some((name.clone(), kind_of(&name, appearance), lvl));
+                        }
+                    }
+                }
+            }
+            None
+        }
+    }
+
+    fn uuid16(short: u16) -> windows::core::GUID {
+        // Bluetooth base UUID 0000xxxx-0000-1000-8000-00805F9B34FB
+        windows::core::GUID::from_values(short as u32, 0x0000, 0x1000, [0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB])
+    }
+
+    pub fn batteries() -> Result<Vec<Value>, String> {
+        unsafe {
+            let selector = BluetoothLEDevice::GetDeviceSelectorFromConnectionStatus(BluetoothConnectionStatus::Connected)
+                .map_err(|e| e.message().to_string())?;
+            let found = DeviceInformation::FindAllAsyncAqsFilter(&selector)
+                .map_err(|e| e.message().to_string())?
+                .join()
+                .map_err(|e| e.message().to_string())?;
+            let mut out = Vec::new();
+            for di in found {
+                let id = match di.Id() {
+                    Ok(id) => id,
+                    Err(_) => continue,
+                };
+                if let Some((name, kind, level)) = level_for(&id) {
+                    out.push(json!({
+                        "name": if name.is_empty() { "Bluetooth device".into() } else { name },
+                        "kind": kind,
+                        "level": level,
+                    }));
+                }
+            }
+            Ok(out)
+        }
+    }
+}
+
+#[cfg(not(windows))]
+mod bt {
+    use serde_json::Value;
+    pub fn batteries() -> Result<Vec<Value>, String> {
+        Ok(Vec::new())
+    }
+}

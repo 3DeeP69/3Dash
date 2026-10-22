@@ -18,6 +18,7 @@ Yes = handed to the thread that owns that area. No = dropped for good.
 11. **Customizable Home** (2026-10-21) — pick + drag-reorder Home cards. Sent to "Weather, projects and logbook".
 12. **Idle ambient mode** (2026-10-21) — screensaver clock/weather/next event. Sent to "3D helmet HUD dashboard app" (core).
 13. **Console sounds, smooth + intuitive** (2026-10-21) — boot chime + section/select sounds, mute. Sent to core.
+14. **Gadget batteries, only when relevant** (2026-10-22) — BT device battery card shows ONLY if a paired device reports battery; never invasive. Core routed it to "Weather, projects and logbook" (card) + "Windows and Android installers" (native read).
 
 ## No
 
@@ -34,7 +35,7 @@ Yes = handed to the thread that owns that area. No = dropped for good.
 
 ## Asked, waiting on answer
 
-21. **Gadget batteries** — battery levels of your Bluetooth stuff (controller, earbuds, headset) on Home. Owner: core (radar) + installers.
+22. **In-app update notice** — T.U.R.D. tells you when a new version is out and updates in one tap. Owner: installers + releases.
 
 ## Already built (skipped, don't ask)
 

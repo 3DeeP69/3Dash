@@ -660,3 +660,16 @@ body:has(.hm-lift){cursor:grabbing;user-select:none}
 .hm-edit-card{padding-top:56px}
 .hm-edit-card>.hm-ov .hm-ov-bar{top:8px}
 .hm-editing .hm-k-tile .hm-body{max-height:420px;overflow:hidden}
+.hm-editing .hm-k-strip .hm-body{min-height:0}
+.hm-editing .hm-body:empty::before,.hm-editing .hm-body:has(>[hidden]:only-child)::before,.hm-editing .hm-body[hidden]::before{min-height:34px}
+/* "quiet" cards (gadget batteries) never show an empty state, not even in Customize */
+.hm-editing .hm-card.hm-quiet:has(>.hm-body:empty){display:none!important}
+.bt-strip .pc-m em{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-ring.warm .fg{stroke:var(--warn)}.pc-ring.hot .fg{stroke:var(--bad)}
+@media (max-width:760px){
+  .hm-editbar{position:relative;padding:12px 14px}
+  .hm-editbar h2{font-size:19px}
+  .hm-editbar p{font-size:13px}
+  .hm-eb-pad{display:none}
+  .hm-follow{font-size:13px}
+}

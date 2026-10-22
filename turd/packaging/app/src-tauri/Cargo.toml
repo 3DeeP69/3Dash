@@ -1,6 +1,6 @@
 [package]
 name = "turd"
-version = "1.1.0"
+version = "1.2.0"
 description = "T.U.R.D. — Totally Unreliable & Really Dumb. A 3D helmet-HUD dashboard."
 authors = ["Bossman"]
 edition = "2021"
@@ -40,7 +40,10 @@ windows = { version = "0.62", features = [
   "Win32_System_Threading",
   "Win32_UI_Shell",
   "Win32_UI_WindowsAndMessaging",
+  "Devices_Bluetooth",
   "Devices_Bluetooth_Advertisement",
+  "Devices_Bluetooth_GenericAttributeProfile",
+  "Devices_Enumeration",
   "Devices_Geolocation",
   "Foundation",
   "Foundation_Collections",

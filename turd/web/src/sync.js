@@ -386,7 +386,7 @@ function refresh() {
   const rel = REL[sec]; const keys = [...deferred];
   if (!rel || LIVE_SECTIONS.has(sec) || !keys.some(rel)) { deferred.clear(); return; }
   const panel = document.getElementById("sec-" + sec), a = document.activeElement;
-  const busyUi = (a && panel && panel.contains(a) && a.matches && a.matches("input,textarea,select,[contenteditable]")) || document.querySelector("#modal.show");
+  const busyUi = (a && panel && panel.contains(a) && a.matches && a.matches("input,textarea,select,[contenteditable]")) || document.querySelector("#modal.show") || (panel && panel.querySelector(".hm-editing, .hm-edit-card")) || (panel && panel.classList.contains("hm-editing"));   // Home Customize mode
   if (busyUi) { deferT = setTimeout(refresh, 2500); return; }                 // don't re-render under the operator's fingers
   deferred.clear();
   const btn = document.querySelector(`.navbtn[data-go="${sec}"]`);

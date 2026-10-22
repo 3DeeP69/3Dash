@@ -11,8 +11,8 @@
 // ===========================================================================
 (function(){
   "use strict";
-  var VERSION = "1.1.0";
-  var DATE = "2026-10-21";
+  var VERSION = "1.2.0";
+  var DATE = "2026-10-22";
   var NOTES = [
     "Device sync between the PC and the Fold4",
     "\"Hey T.U.R.D.\" hands-free voice, offline",

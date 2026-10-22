@@ -299,7 +299,9 @@ const CSS = `
 #vbub .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #vbub.hear .t{color:#fff}
 #vbub .x{pointer-events:auto;margin-left:6px;background:none;border:0;color:rgba(255,255,255,.55);font-size:18px;cursor:pointer;padding:0 0 0 6px;display:none}
-#vbub.vcard{border-radius:18px;align-items:flex-start;padding:16px 18px;pointer-events:auto}
+#vbub.vcard{border-radius:18px;align-items:flex-start;padding:16px 18px}
+#vbub.vcard.show{pointer-events:auto}
+#vbub:not(.show){pointer-events:none!important}
 #vbub.vcard .t{white-space:normal}
 #vbub.vcard .row{display:flex;gap:8px;margin-top:10px}
 #vbub.vcard button{padding:8px 14px;border-radius:10px;border:1px solid rgba(var(--accent-rgb),.4);background:rgba(var(--accent-rgb),.16);color:#fff;font:inherit;font-size:13px;cursor:pointer}

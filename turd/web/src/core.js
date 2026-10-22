@@ -19,8 +19,8 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
 /* ---- known section files (dynamic-imported; missing files are skipped) ---- */
-const SECTION_FILES = ["home","assistant","weather","projects","logbook","chat","opsec","radar","netwatch","entertainment","extras"];
-const ORDER = ["home","assistant","weather","logbook","chat","opsec","radar","netwatch","entertainment","extras","projects"]; // Projects lands at the bottom of the rail
+const SECTION_FILES = ["home","assistant","weather","projects","logbook","chat","opsec","entertainment","extras"]; // radar+netwatch fold into the Spy Tools (opsec) tab, no longer standalone sections
+const ORDER = ["home","assistant","weather","logbook","chat","opsec","entertainment","extras","projects"]; // Projects lands at the bottom of the rail
 
 /* ------------------------------------------------------------- utilities */
 export const LS = {

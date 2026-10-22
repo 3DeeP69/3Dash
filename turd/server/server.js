@@ -33,7 +33,7 @@ const PORT = +process.env.PORT || 8787;
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, "data"));
 const STATIC_DIR = process.env.STATIC_DIR === "" ? null : path.resolve(process.env.STATIC_DIR || path.join(__dirname, "..", "web"));
 const GEOIP = process.env.GEOIP !== "0";
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 
 const MAX_MSG = 2000, HISTORY = 500, AUDIT_MEM = 5000;
 const TOKEN_TTL = 1000 * 60 * 60 * 24 * 7;            // 7 days

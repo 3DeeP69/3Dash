@@ -39,9 +39,9 @@ and publishes a GitHub Release when you push a `v1.2.3` tag.
   needs xvfb). It runs the real download, resume, cancel, sha256, readRange, unzip and server code against a flaky local server.
 
 ## Signing
-- **Android:** `keys/turd-release.jks` is a self-signed key (alias `turd`). It is **not in git**; its
-  passwords live in `keys/keystore.properties` on the build machine and in the repo's Actions secrets.
-  Android installs updates only over an app signed with the same key, so keep this file. For the Play Store or a "real" key, generate one with `keytool`, put it in CI
+- **Android:** `keys/turd-release.jks` is a self-signed key (alias `turd`, password `turd-dev-key`,
+  in `keys/keystore.properties`). Android installs updates only over an app signed with the same key,
+  so keep this file. For the Play Store or a "real" key, generate one with `keytool`, put it in CI
   secrets (`ANDROID_KEYSTORE_B64` etc., see the workflow). Switching keys means uninstalling once.
 - **Windows:** the installer is unsigned for now, so SmartScreen says "Windows protected your PC" →
   **More info → Run anyway**. To remove that, buy a code-signing certificate (or use Azure Trusted

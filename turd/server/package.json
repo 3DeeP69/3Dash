@@ -1,6 +1,6 @@
 {
   "name": "turd-uplink",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "T.U.R.D. uplink server — accounts, login, realtime chat, admin connection log. Core is zero-dependency (Node 18+); the optional AI assistant uses the official Anthropic SDK.",
   "type": "commonjs",

@@ -7,6 +7,17 @@ To check which build you have: the version is shown under the login form and nex
 
 ---
 
+## Next (not built yet)
+
+Already in the shared code, waiting for the next build:
+- **Ambient screen when idle:** a big clock, weather and your next event, drifting slowly to protect the screen. The AMBIENT chip sets Off, 2, 4 or 8 minutes. It keeps the Fold awake only while charging, and the 3D background slows down to save power.
+- **Console sounds:** a PS3-style boot chime plus navigation, select, open, close and error sounds, pitched to each section's theme. The SOUND chip mutes them or sets the volume.
+- Network watch matches the v1.1.0 scanner.
+- **Customizable Home:** show or hide cards and drag them into any order with touch, mouse, keyboard or a controller (hold a card, press Y, or use "✎ Customize Home"). The layout is saved per device, or shared across devices with one switch.
+- **Gadget batteries on Home:** controllers, earbuds and headsets that report a battery level. The card only appears when one does, and it needs the next app build.
+
+---
+
 ## v1.1.0 (2026-10-21) · CURRENT
 
 Windows installer, Fold4 APK and desktop zip, all v1.1.0.
@@ -40,7 +51,7 @@ Install over the old version. Your accounts, logbook and chat stay. The APK is s
 - Cleaner borders and less blur on the PC.
 
 **Known**
-- No .msi yet. It needs a Windows build on GitHub, and the Claude app still can't see the 3Dash repo.
+- The .msi is built by GitHub (Windows CI) and added to the GitHub release when that build succeeds.
 - The PC app's built-in server reports itself as 1.0.0 (a leftover label; it is the 1.1.0 server). This is fixed for the next build.
 - Not tested on a real PC or Fold yet, only in emulated sizes. Tell me anything that breaks.
 

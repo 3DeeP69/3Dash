@@ -824,3 +824,69 @@ pub async fn nat_wake_on_lan(a: Value) -> Res {
     }
     Ok(json!({ "ok": true, "sent": sent }))
 }
+
+/// Bounded TCP port scan of one host on the local network, for the Spy tools recon view.
+/// Defaults to common service ports; `ports` overrides. Connect scan only, short timeout,
+/// small concurrency so it stays light on a low-end PC. Returns the open ports with a guessed
+/// service name. Meant for your own network.
+#[tauri::command]
+pub async fn nat_port_scan(a: Value) -> Res {
+    let host = s(&a, "host");
+    if host.is_empty() {
+        return Err("no host to scan".into());
+    }
+    let ip: std::net::IpAddr = host.parse().map_err(|_| "host must be an IP address on your network".to_string())?;
+    let ports: Vec<u16> = a
+        .get("ports")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|v| v.as_u64()).filter(|p| *p >= 1 && *p <= 65535).map(|p| p as u16).collect())
+        .filter(|v: &Vec<u16>| !v.is_empty())
+        .unwrap_or_else(|| COMMON_PORTS.iter().map(|(p, _)| *p).collect());
+    let timeout = Duration::from_millis(a.get("timeoutMs").and_then(|v| v.as_u64()).unwrap_or(500).clamp(100, 2000));
+
+    let open = tokio::task::spawn_blocking(move || {
+        use std::sync::atomic::AtomicUsize;
+        let next = Arc::new(AtomicUsize::new(0));
+        let ports = Arc::new(ports);
+        let found = Arc::new(Mutex::new(Vec::<u16>::new()));
+        let mut handles = Vec::new();
+        for _ in 0..16 {
+            let (next, ports, found) = (next.clone(), ports.clone(), found.clone());
+            handles.push(std::thread::spawn(move || loop {
+                let i = next.fetch_add(1, Ordering::Relaxed);
+                let Some(port) = ports.get(i).copied() else { break };
+                if std::net::TcpStream::connect_timeout(&std::net::SocketAddr::new(ip, port), timeout).is_ok() {
+                    found.lock().unwrap().push(port);
+                }
+            }));
+        }
+        for h in handles {
+            let _ = h.join();
+        }
+        let mut v = Arc::try_unwrap(found).unwrap().into_inner().unwrap();
+        v.sort_unstable();
+        v
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let items: Vec<Value> = open
+        .into_iter()
+        .map(|p| json!({ "port": p, "service": service_name(p) }))
+        .collect();
+    Ok(json!({ "host": host, "items": items }))
+}
+
+const COMMON_PORTS: &[(u16, &str)] = &[
+    (21, "ftp"), (22, "ssh"), (23, "telnet"), (25, "smtp"), (53, "dns"), (80, "http"),
+    (110, "pop3"), (111, "rpc"), (135, "msrpc"), (139, "netbios"), (143, "imap"), (443, "https"),
+    (445, "smb"), (515, "printer"), (548, "afp"), (554, "rtsp"), (631, "ipp"), (993, "imaps"),
+    (995, "pop3s"), (1883, "mqtt"), (1900, "ssdp"), (3000, "http-alt"), (3306, "mysql"),
+    (3389, "rdp"), (5000, "upnp"), (5353, "mdns"), (5432, "postgres"), (5900, "vnc"),
+    (6379, "redis"), (7000, "http-alt"), (8000, "http-alt"), (8009, "ajp"), (8080, "http-proxy"),
+    (8443, "https-alt"), (8787, "turd"), (8883, "mqtts"), (9000, "http-alt"), (32400, "plex"),
+];
+
+fn service_name(port: u16) -> &'static str {
+    COMMON_PORTS.iter().find(|(p, _)| *p == port).map(|(_, n)| *n).unwrap_or("")
+}
