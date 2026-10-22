@@ -172,6 +172,7 @@ function pickVoice(){
   return vs.find(v=>/^en/i.test(v.lang))||vs[0];
 }
 function speak(text){
+  if(window.TURD_SPEAK){ window.TURD_SPEAK.speak(plain(text), { onstart:()=>orb?.set("speak"), onboundary:()=>orb?.pulse(.5), onend:()=>{ if(!busy) orb?.set("idle"); } }); return; }   // shared voice (voice/speak.js)
   if(!("speechSynthesis" in window)) return;
   try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(plain(text).slice(0,1500)); const v=pickVoice(); if(v) u.voice=v; u.rate=1.04; u.pitch=.96;
     u.onboundary=()=>orb&&orb?.pulse(.5); u.onstart=()=>orb&&orb?.set("speak"); u.onend=()=>orb&&!busy&&orb?.set("idle"); speechSynthesis.speak(u); }catch(e){}
@@ -472,7 +473,7 @@ export default {
   unmount(){
     mounted=false; ready=false; if(busy && ctl){ /* the server keeps answering; it'll be in history */ }
     offs.forEach(f=>f()); offs=[]; orb?.destroy(); orb=null; if(rec){ try{ rec.stop(); }catch(e){} }
-    try{ speechSynthesis.cancel(); }catch(e){}
+    try{ window.TURD_SPEAK && !window.TURD_BRIEF?.playing ? window.TURD_SPEAK.stop() : speechSynthesis.cancel(); }catch(e){}
     stream=null;
   },
   summary(){

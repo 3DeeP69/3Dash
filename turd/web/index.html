@@ -264,6 +264,68 @@ body:not([data-quality="HIGH"]) #rail .nav{background:rgba(5,10,22,.86)}
 .st-btn:hover,.st-btn:focus-visible{outline:none;color:var(--ink);text-shadow:0 0 12px rgba(var(--accent-rgb),.8)}
 #stAudit{color:#ff8a9c}#stAudit:hover{color:#fff;text-shadow:0 0 12px rgba(255,92,122,.8)}
 @media(max-width:760px){ #st-tools{position:fixed;top:calc(36px + var(--sat,0px));left:16px;margin:0;font-size:9px} .st-btn{padding:6px 6px 6px 0} }
+/* ---- v1.3.0 chrome tidy: settings tray + phone status rows (tidy-up thread) ---- */
+/* the settings chips (sound, ambient, quality) share one baseline: left two under the panel's
+   left edge, quality under its right edge, all clear of the rail, dock and corner reticles */
+html body #sndcfg,html body #idlecfg,html body #perf{bottom:14px;top:auto;font-size:10px;letter-spacing:1.5px;padding:6px 4px;white-space:nowrap}
+@media(min-width:761px){
+  html body #sndcfg{left:calc(var(--rail) + var(--rail-x) + 20px)}
+  html body #idlecfg{left:calc(var(--rail) + var(--rail-x) + 128px)}
+}
+@media(max-width:760px){
+  /* a 22px lane between the panel and the dock holds the tray */
+  #stage{padding-bottom:calc(var(--dock) + 38px + var(--sab))}
+  html body #sndcfg,html body #idlecfg,html body #perf{bottom:calc(80px + var(--sab));font-size:9px;letter-spacing:1px;padding:4px 2px}
+  html body #sndcfg{left:18px}
+  html body #idlecfg{left:100px}
+  html body #perf{right:18px;left:auto}
+  /* row 2 of the status bar: tools scroll sideways instead of running under other text */
+  #st-tools{right:16px;white-space:nowrap;overflow-x:auto;scrollbar-width:none;
+    -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 18px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 18px),transparent)}
+  #st-tools::-webkit-scrollbar{display:none}
+  #status .rstat{white-space:nowrap;flex:none}
+}
+@media(max-width:420px){ #st-loc,#st-loc+.sep{display:none} #status{padding-right:16px} }
+/* voice: the off state reads as dimmed, the first-run card uses the full phone width */
+#status #st-voice.off .vl{text-decoration:none;opacity:.55}
+html body #vbub{width:max-content}
+#status,#status *{white-space:nowrap}
+#status .rstat,#st-tools{flex:none}
+@media(min-width:761px) and (max-width:1500px){ #status .brand small{display:none} #status{gap:12px} #status .rstat{gap:10px} }
+@media(min-width:761px) and (max-width:1360px){ #st-sys,#st-sys+.sep{display:none} #status #st-voice .vl{display:none} }
+@media(min-width:761px) and (max-width:1180px){ #st-loc,#st-loc+.sep{display:none} #status .rstat{font-size:10px;letter-spacing:1.2px} }
+@media(min-width:761px) and (max-width:960px){ #status .turd-ver{display:none} }
+.brf{flex-wrap:wrap;row-gap:2px}.brf button,.brf span{white-space:nowrap}.hm-top>div:first-child{min-width:0}
+.cs-head{gap:12px}.cs-head>*{white-space:nowrap}
+#login.hide{visibility:hidden;transition:opacity .7s,visibility 0s .7s}
+.navbtn:focus-visible{box-shadow:inset 0 0 0 1.5px rgba(var(--accent-rgb),.75)}
+.st-btn:focus-visible{outline:1.5px solid rgba(var(--accent-rgb),.7);outline-offset:2px;border-radius:6px}
+html body .turd-ver:focus-visible{outline:1.5px solid rgba(var(--accent-rgb),.7);outline-offset:2px;border-radius:6px}
+@media (min-width:761px) and (max-height:820px){html body .hm-board{flex:none}html body .hm-k-tile .hm-body>.hm-tile{min-height:330px}}
+@media (max-width:1300px){html body .cs-row{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 40px),transparent);padding-inline-end:40px}}
+html body .hm-wx>.t-k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
+html body .cs-info{flex:1}html body .cs-info span{display:block;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:760px){html body .brf .sep{display:none}html body .brf{column-gap:22px;row-gap:0}}
+@media (max-width:760px){html body .xx-tabs,html body .ent-row{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);padding-inline-end:36px}}
+@media (max-height:820px){html body .as-anchor-big{width:min(132px,22vh);margin-bottom:14px}html body .as-hero h2{margin-bottom:4px}html body .as-hero p{margin-bottom:14px}html body .as-sugg{gap:0}}
+html body .as-sugg button::after{content:"\00a0→"}
+.section:not(.show) *,.section:not(.show) *::before,.section:not(.show) *::after,#login.hide *,#login.hide *::before,#login.hide *::after{animation-play-state:paused!important}
+@media(pointer:coarse){
+  .brf button,.as-status,.ops-tg,.ops-map-bar select,.xc-l{min-height:40px}
+  .xc-l{display:inline-flex;align-items:center}
+  html body .as-btn.as-send{min-width:40px!important;min-height:40px!important}
+  .leaflet-touch .leaflet-bar a,.leaflet-control-zoom a{width:40px!important;height:40px!important;line-height:40px!important}
+  html body input[type=checkbox]{width:20px!important;height:20px!important;flex:none;min-width:20px}
+}
+.phead .k{border:0;padding:0 2px;border-radius:0;text-shadow:0 0 12px rgba(var(--accent-rgb),.8)}
+html body .fw-k{border:0;padding:0 2px;text-shadow:0 0 12px rgba(var(--fa-rgb,var(--accent-rgb)),.8)}
+html body #idle{background:radial-gradient(120% 90% at 50% 40%,rgba(6,12,28,.97),rgba(1,2,6,.995))}
+html body .idle-clock{white-space:nowrap;font-size:min(17vw,210px)}
+html body .idle-row,html body .idle-date{padding-inline:18px}
+@media(max-width:760px){
+  .modal-card{padding:20px 18px}
+  .modal-card table{display:block;max-width:100%;overflow-x:auto;white-space:nowrap;scrollbar-width:thin}
+}
 </style>
 <!-- section modules may add their own styles here (owned by the at-a-glance thread) -->
 <link rel="stylesheet" href="./src/sections/sections.css" onerror="this.remove()">

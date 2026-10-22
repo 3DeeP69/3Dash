@@ -8,8 +8,13 @@ let started=false, ctxRef=null, ac=null, master=null, armed=false;
 
 const KEY="turd_sfx";
 const VOLS=[0, 0.07, 0.15, 0.26];                 // OFF / LOW / MED / HIGH master levels (kept gentle)
-const cfg = ()=> Object.assign({vol:2}, (ctxRef&&ctxRef.LS?ctxRef.LS.get(KEY,{}):{}));
+const cfg = ()=> Object.assign({vol:2}, (ctxRef&&ctxRef.LS?ctxRef.LS.get(KEY,{}):{}));   // default MED; mute/volume via the SOUND chip
 const setCfg = o=>{ try{ ctxRef.LS.set(KEY, Object.assign(cfg(),o)); }catch(e){} };
+
+// bootDone: resolves when the boot chime finishes (or immediately when muted) so the login
+// briefing can await it instead of guessing a delay. Always resolves — never left hanging.
+let bootResolve=null; const bootReady=new Promise(r=>{ bootResolve=r; });
+const finishBoot=()=>{ if(bootResolve){ const r=bootResolve; bootResolve=null; r(); } };
 
 function ensure(){
   if(ac) return ac;
@@ -50,9 +55,11 @@ const S = {
   open(){ if(!on()) return; const p=themePitch(); voice(440*p,{dur:0.16,peak:0.4,glide:760*p}); },
   close(){ if(!on()) return; const p=themePitch(); voice(620*p,{dur:0.16,peak:0.38,glide:360*p}); },
   error(){ if(!on()) return; voice(200,{type:"triangle",dur:0.22,peak:0.5}); voice(150,{type:"triangle",dur:0.26,peak:0.4,delay:0.08}); },
-  boot(){ if(!on()) return; const p=themePitch(); // soft ascending chime + pad — original, not Sony's audio
-    [0,0.12,0.24,0.40].forEach((d,i)=> voice([392,523,659,784][i]*p,{type:"sine",dur:0.7-i*0.06,peak:0.34,delay:d}));
-    voice(196*p,{type:"triangle",dur:1.1,peak:0.14,delay:0.02}); },
+  boot(){ const live=on(); if(live){ const p=themePitch(); // soft ascending chime + pad — original, not Sony's audio
+      [0,0.12,0.24,0.40].forEach((d,i)=> voice([392,523,659,784][i]*p,{type:"sine",dur:0.7-i*0.06,peak:0.34,delay:d}));
+      voice(196*p,{type:"triangle",dur:1.1,peak:0.14,delay:0.02}); }
+    setTimeout(finishBoot, live?1200:0); },   // ~1.15s of chime; signal bootDone once it's clear
+  get bootDone(){ return bootReady; },
   setVol(v){ setCfg({vol:v}); if(master&&ac) master.gain.setTargetAtTime(VOLS[v]||0, ac.currentTime, 0.02); },
   get muted(){ return (cfg().vol||0)===0; },
 };
@@ -62,6 +69,7 @@ export function init(ctx){
   // a user gesture is required before audio may play; arm on the first one
   ["pointerdown","keydown","touchstart"].forEach(ev=>addEventListener(ev, arm, {once:false, passive:true}));
   buildChip(); wireObservers();
+  setTimeout(finishBoot, 3000);   // fail-safe: resolve bootDone even if the boot chime never fires
 }
 
 function wireObservers(){

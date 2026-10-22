@@ -673,3 +673,27 @@ body:has(.hm-lift){cursor:grabbing;user-select:none}
   .hm-eb-pad{display:none}
   .hm-follow{font-size:13px}
 }
+/* PC strip heartbeat: the status dot pulses each time live numbers land */
+.pc-beat.on{animation:pcBeat .6s ease-out}
+@keyframes pcBeat{0%{box-shadow:0 0 0 0 rgba(73,246,176,.7),0 0 8px var(--ok)}100%{box-shadow:0 0 0 7px rgba(73,246,176,0),0 0 8px var(--ok)}}
+.pc-m b [data-n]{font-variant-numeric:tabular-nums}
+.pc-m b{font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){.pc-beat.on{animation:none}}
+/* Internet health strip (netcard.js) */
+.net-strip.down{background:linear-gradient(90deg,rgba(255,92,122,.16),rgba(255,255,255,.03) 45%,rgba(255,255,255,.02))}
+.net-strip.down .pc-k{color:var(--bad)}
+/* v1.3.0 polish (tidy-up notes): every strip keeps its label in a fixed left column, so metrics that wrap
+   start under the first metric (not under the label) and PC / Fold / Internet / Gadgets line up */
+.pc-strip:not(.dim){display:flex;flex-wrap:wrap;align-items:center;gap:8px 26px;padding-left:228px;min-height:58px}
+.pc-strip:not(.dim)>.pc-k{position:absolute;left:20px;top:0;bottom:0;width:196px;display:flex;align-items:center;overflow:hidden}
+.pc-strip:not(.dim)>.pc-k small{overflow:hidden;text-overflow:ellipsis}
+@media (max-width:760px){ .pc-strip:not(.dim){padding-left:14px} .pc-strip:not(.dim)>.pc-k{position:static;width:100%} }
+.hm-ov-bar{box-shadow:0 8px 24px rgba(0,0,0,.4);background:linear-gradient(90deg,rgba(var(--accent-rgb),.26),rgba(6,12,28,.88) 55%)}
+.hm-grip{background:rgba(var(--accent-rgb),.22)}
+.hm-ov-acts button{border-color:transparent;background:rgba(255,255,255,.08)}
+/* Home tiles when a load failed or timed out (never endless dots) */
+.hm-fail{margin:18px 0 4px;color:var(--ink-dim);font-size:15px}
+.hm-tile [data-retry]{margin-top:2px;padding-top:6px}
+/* perf (v1.4.0): only the hero + Home tile icons animate; the ~50 small glyphs in the 24h curve,
+   7-day list and Home hourly strip hold still (each was repainting its SVG every frame) and wake on hover */
+.wx-curve svg *,.wx-day:not(:hover) svg *,.hm-strip>div:not(:hover) svg *{animation:none!important}

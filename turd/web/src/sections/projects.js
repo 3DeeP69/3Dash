@@ -136,7 +136,9 @@ function grid(){
     <div class="pj-grid">${list.map(card).join("")}</div>`;
   $("#pjPing",panel).onclick=()=>doPing(true);
   $("#pjAdd",panel).onclick=addForm;
-  $$(".pj-card",panel).forEach(c=>c.onclick=()=>detail(c.dataset.id));
+  $$(".pj-card",panel).forEach(c=>{ c.onclick=()=>detail(c.dataset.id);
+    c.tabIndex=0; c.setAttribute("role","button"); c.setAttribute("aria-label",`Open ${c.querySelector("h2,h3,.pj-title")?.textContent||"project"} details`);
+    c.onkeydown=e=>{ if(e.target===c && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); c.click(); } }; });
   // stagger iframe loads so we never stall the render thread
   stopTilt(); stopTilt=tilt(panel,".pj-card",7);
 }

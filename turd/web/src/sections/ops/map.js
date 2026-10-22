@@ -1,29 +1,43 @@
 // Spy Tools — LIVE MAP. One map, many layers, filter toggles to cut off any of them:
 //   ✈ aircraft (public ADS-B)   ⚑ police (gov/police aircraft + UK incident open data)
 //   ⦿ ALPR cameras (DeFlock/OSM)   ◻ other cameras (OSM CCTV)   ⌖ you
-// Leaflet is lazy-loaded from a CDN the first time the map opens (the app needs a network
-// connection for map data anyway); OSM raster tiles render straight in the webview.
-// Returns a cleanup function. Performance: canvas renderer, capped marker counts, a single
-// ~15 s aircraft refresh that only runs while the map is the visible sub-tab.
+// Leaflet is bundled with the app (web/vendor/leaflet), so the map always loads with no CDN
+// or API key; the unpkg URLs are only a fallback for the plain browser preview. Map tiles are
+// free, keyless OpenStreetMap/CARTO rasters. Returns a cleanup function. Performance: canvas
+// renderer, capped marker counts, a single ~15 s aircraft refresh while the map is visible.
 import * as SRC from "./sources.js";
 
-const LEAFLET_CSS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-const LEAFLET_JS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+const LEAFLET_LOCAL_CSS = new URL("../../../vendor/leaflet/leaflet.css", import.meta.url).href;
+const LEAFLET_LOCAL_JS = new URL("../../../vendor/leaflet/leaflet.js", import.meta.url).href;
+const LEAFLET_CDN_CSS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+const LEAFLET_CDN_JS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const KEY = "turd_ops_map";          // {lat, lon, z, layers:{}}
 const DEF = { lat: 35.05, lon: -89.95, z: 11 }; // Memphis / north-MS metro; replaced by your location / last view
 
 let leafletP = null;
+function addScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = src; s.async = true;
+    s.onload = () => res(window.L); s.onerror = () => rej(new Error("load failed: " + src));
+    document.head.appendChild(s);
+  });
+}
 function loadLeaflet() {
   if (window.L) return Promise.resolve(window.L);
   if (leafletP) return leafletP;
-  leafletP = new Promise((res, rej) => {
+  leafletP = (async () => {
     if (!document.getElementById("leaflet-css")) {
-      const l = document.createElement("link"); l.id = "leaflet-css"; l.rel = "stylesheet"; l.href = LEAFLET_CSS; document.head.appendChild(l);
+      const l = document.createElement("link"); l.id = "leaflet-css"; l.rel = "stylesheet";
+      l.href = LEAFLET_LOCAL_CSS; l.onerror = () => { l.href = LEAFLET_CDN_CSS; };
+      document.head.appendChild(l);
     }
-    const s = document.createElement("script"); s.src = LEAFLET_JS; s.async = true;
-    s.onload = () => res(window.L); s.onerror = () => rej(new Error("map library unavailable (no connection?)"));
-    document.head.appendChild(s);
-  });
+    // bundled copy first; fall back to the CDN only if it isn't there (browser preview)
+    try { return await addScript(LEAFLET_LOCAL_JS); }
+    catch (e) {
+      try { return await addScript(LEAFLET_CDN_JS); }
+      catch (e2) { throw new Error("map library unavailable (no connection?)"); }
+    }
+  })();
   return leafletP;
 }
 
@@ -91,10 +105,53 @@ export function mountMap(el, ctx) {
     if (dead) return;
     L = _L;
     map = L.map("opsMap", { preferCanvas: true, zoomControl: true, attributionControl: true }).setView([saved.lat, saved.lon], saved.z);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19, subdomains: "abcd",
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
-    }).addTo(map);
+    // Resilient keyless basemap. NONE of these needs an API key. We try dark CARTO first and
+    // auto-fail-over through the other free providers if tiles can't paint, so the map can never
+    // be left grey. Non-dark providers (OSM) get a CSS "dark HUD" filter via .ops-dim so the look
+    // stays consistent. (App CSP must allow these tile hosts in img-src — see installer notes.)
+    const PROVIDERS = [
+      { name: "Dark", dark: true, url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", opts: { subdomains: "abcd", maxZoom: 20 }, attr: "&copy; OpenStreetMap &copy; CARTO" },
+      { name: "Dark Gray", dark: true, url: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}", opts: { maxZoom: 16 }, attr: "Tiles &copy; Esri" },
+      { name: "Street", dark: false, url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", opts: { maxZoom: 19 }, attr: "&copy; OpenStreetMap" },
+      { name: "Satellite", dark: true, url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", opts: { maxZoom: 19 }, attr: "Tiles &copy; Esri" },
+    ];
+    const mapEl = document.getElementById("opsMap");
+    if (!document.getElementById("ops-tiles-css")) {
+      const st = document.createElement("style"); st.id = "ops-tiles-css";
+      st.textContent = ".ops-dim .leaflet-tile{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.75)}";
+      document.head.appendChild(st);
+    }
+    let baseLayer = null, offErrs = 0, baseSwitches = 0;
+    // offline / tiles-unreachable notice (matches the rest of the app's "unavailable · retry" states)
+    const offEl = document.createElement("div");
+    offEl.className = "ops-map-off"; offEl.hidden = true;
+    offEl.innerHTML = `<div class="ops-map-off-in"><b>Map tiles can't load right now.</b><span>Check your connection.</span><button class="t-btn sm" id="opsMapRetry">⟲ Retry</button></div>`;
+    if (mapEl) mapEl.appendChild(offEl);
+    const showOff = on => { offEl.hidden = !on; };
+    offEl.querySelector("#opsMapRetry").onclick = () => { offErrs = 0; baseSwitches = 0; showOff(false); try { if (baseLayer) baseLayer.redraw(); } catch (e) {} };
+    const setBase = idx => {
+      idx = ((idx % PROVIDERS.length) + PROVIDERS.length) % PROVIDERS.length;
+      const p = PROVIDERS[idx];
+      if (baseLayer) { try { map.removeLayer(baseLayer); } catch (e) {} }
+      let errs = 0, loaded = 0, switched = false;
+      const tl = L.tileLayer(p.url, Object.assign({ attribution: p.attr }, p.opts));
+      tl.on("tileload", () => { loaded++; offErrs = 0; baseSwitches = 0; showOff(false); });
+      // if a provider can't paint its first screenful, fall over to the next (never leave it grey) —
+      // but only cycle through each provider once; if they all fail (offline / tile servers down),
+      // stop cycling and show the retry notice instead of looping forever
+      tl.on("tileerror", () => {
+        errs++; offErrs++;
+        if (!switched && errs >= 3 && loaded < 2 && baseSwitches < PROVIDERS.length) { switched = true; baseSwitches++; setBase(idx + 1); return; }
+        // every provider has been tried (or lots of errors with nothing painted) → show the notice
+        if (loaded < 1 && (baseSwitches >= PROVIDERS.length || offErrs >= 6)) showOff(true);
+      });
+      tl.addTo(map); baseLayer = tl;
+      if (mapEl) mapEl.classList.toggle("ops-dim", !p.dark);
+      const nm = el.querySelector("#opsBaseName"); if (nm) nm.textContent = p.name;
+      flags.base = idx; save();
+    };
+    map._setBase = setBase; map._baseCount = PROVIDERS.length;
+    setBase(typeof flags.base === "number" ? flags.base : 0);
     const canvas = L.canvas({ padding: 0.5 });
     layers = {
       air: L.layerGroup().addTo(flags.air ? map : L.layerGroup()),

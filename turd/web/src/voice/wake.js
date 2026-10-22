@@ -58,7 +58,7 @@ function loadLib() {
   });
 }
 function navPhrases() {
-  const out = new Set(["[unk]", "cancel", "never mind", "stop listening", "go to sleep"]);
+  const out = new Set(["[unk]", "cancel", "never mind", "stop listening", "go to sleep", "read my briefing", "read the briefing", "play my briefing", "brief me", "briefing"]);
   for (const names of Object.values(liveSections())) for (const n of names) {
     out.add(n);
     for (const v of VERBS) { out.add(`${v} ${n}`); out.add(`${v} the ${n}`); out.add(`${v} my ${n}`); }
@@ -133,7 +133,7 @@ function frame(buf) {
   let e = 0; for (let i = 0; i < buf.length; i++) e += buf[i] * buf[i];
   const rms = Math.sqrt(e / buf.length);
   ring.push(buf); if (ring.length > 6) ring.shift();          // 0.6 s pre-roll
-  const speaking = typeof speechSynthesis !== "undefined" && speechSynthesis.speaking;
+  const speaking = window.TURD_SPEAK ? window.TURD_SPEAK.speaking : (typeof speechSynthesis !== "undefined" && speechSynthesis.speaking);
   if (mode === "wake" && (speaking || document.hidden)) { if (gate.open) closeGate(); return; }
   const loud = rms > Math.max(gate.floor * 3, 0.006);
   if (!loud) gate.floor = gate.floor * 0.995 + rms * 0.005; else if (rms < gate.floor) gate.floor = rms;
@@ -198,6 +198,7 @@ function route(text, navText) {
   if (!t) return { kind: "none" };
   if (/^(cancel|never ?mind|nothing|forget it)\b/.test(t)) return { kind: "cancel" };
   if (/^(stop listening|go to sleep|turn off (voice|listening)|mute)\b/.test(t)) return { kind: "sleep" };
+  if (/^(read|play|give) (me )?(my |the )?(daily )?briefing\b|^brief me\b|^(my |the )?briefing$/.test(t) || /\b(briefing|brief me)\b/.test(navText || "")) return { kind: "brief" };
   const secs = liveSections();
   const hit = phrase => { for (const [id, names] of Object.entries(secs)) if (names.some(n => phrase === n)) return id; return null; };
   // the navigation grammar is the most reliable signal for "go to X"
@@ -227,6 +228,7 @@ function lev(a, b) {
 function act(r, text) {
   if (r.kind === "none") { chime(false); bubble("Didn't catch that", "miss", 1600); return; }
   if (r.kind === "cancel") { chime(false); bubble("Okay", "miss", 900); return; }
+  if (r.kind === "brief") { bubble("Briefing", "go", 1200); window.TURD_BRIEF?.play?.(); return; }
   if (r.kind === "sleep") { bubble("Voice off", "miss", 1400); disable(); return; }
   if (r.kind === "go") {
     const def = (K?.sections?.() || []).find(d => d.id === r.id);
@@ -250,7 +252,11 @@ export async function enable(persist = true) {
     return true;
   } catch (e) {
     closeMic();
-    const msg = /denied|NotAllowed|Permission/i.test(String(e?.name) + e?.message) ? "Microphone blocked. Allow it for T.U.R.D. in settings." : (e?.message || "voice unavailable");
+    const why = String(e?.name) + " " + (e?.message || "");
+    const msg = /denied|NotAllowed|Permission/i.test(why) ? "Microphone blocked. Allow it for T.U.R.D. in settings."
+      : /NotFound|DevicesNotFound|not found|OverconstrainedError/i.test(why) ? "No microphone found. Plug one in, then tap VOICE."
+      : /NotReadable|TrackStart|Could not start|AbortError/i.test(why) ? "Mic is busy in another app. Close it and tap VOICE."
+      : (e?.message || "voice unavailable");
     setState("error", msg); K?.toast?.(msg); return false;
   }
 }
@@ -375,6 +381,7 @@ export function init(ctx) {
   K = ctx; mountUI(); setState("off");
   window.TURD_VOICE = { get state() { return S; }, enable, disable, capture, on(fn) { subs.add(fn); return () => subs.delete(fn); } };
   document.addEventListener("visibilitychange", () => { if (!ac) return; document.hidden ? ac.suspend().catch(() => {}) : ac.resume().catch(() => {}); });
+  import("./briefing.js").then(m => m.init(ctx)).catch(e => console.warn("[voice] briefing", e));
   if (LS.get("turd_voice_on", null) === true) enable();
   else setTimeout(offerOnce, 2500);
 }

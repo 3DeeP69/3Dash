@@ -62,7 +62,7 @@ function weatherLine(w, full){
 }
 const openTasks=()=>{ try{ return logEntries(LS).filter(e=>e.cat==="task"&&!e.done).sort((a,b)=>b.t-a.t); }catch(e){ return []; } };
 
-async function briefing(user){
+export async function briefing(user){
   const w=WX.brief(WX.cached()), tasks=openTasks(), m=await loadCal(), up=m?.upcoming?m.upcoming(3):[];
   const h=new Date().getHours(), hi=h<5?"Late one":h<12?"Morning":h<17?"Afternoon":h<22?"Evening":"Late one";
   const out=[`${hi}${user?", "+user:""}.`];

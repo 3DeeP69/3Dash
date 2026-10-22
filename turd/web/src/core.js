@@ -352,11 +352,12 @@ function pollPad(){
   const pads=navigator.getGamepads?[...navigator.getGamepads()].filter(Boolean):[];
   if(!pads.length){ padRaf=0; return; }
   pads.forEach(p=>{ const hit=n=>{ const on=!!p.buttons[n]?.pressed, was=padPrev[p.index+":"+n]; padPrev[p.index+":"+n]=on; return on&&!was; };
-    if(BOOTED && !window.TURD_OVERLAY && !$("#modal").classList.contains("show")){ if(hit(13)||hit(5)) step(1); if(hit(12)||hit(4)) step(-1); }
+    if(BOOTED && !window.TURD_OVERLAY && !$("#modal").classList.contains("show")){ const pn=window.TURD_PADNAV, dn=hit(13), up=hit(12); if(hit(5)||(!pn&&dn)) step(1); if(hit(4)||(!pn&&up)) step(-1); }
     else { hit(13); hit(5); hit(12); hit(4); } });
   padRaf=requestAnimationFrame(pollPad);
 }
 addEventListener("gamepadconnected",()=>{ if(!padRaf) padRaf=requestAnimationFrame(pollPad); });
+import("./padnav.js").catch(()=>{});   // console focus navigation inside sections (tidy thread, v1.4.0)
 function forcePassChange(user){
   const card=$(".login-card");
   card.innerHTML=`<div class="login-logo" style="font-size:28px">SET PASSKEY</div><div class="login-sub">first uplink · rotate the default</div>

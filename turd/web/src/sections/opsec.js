@@ -9,6 +9,7 @@
 import { edgeFades } from "./util.js";
 import { mountMap } from "./ops/map.js";
 import { mountRecon } from "./ops/recon.js";
+import { mountNetHealth } from "./ops/nethealth.js";
 import { mountRadar, unmountRadar } from "./radar.js";
 import { mountNetwatch, unmountNetwatch } from "./netwatch.js";
 
@@ -30,6 +31,7 @@ const TABS = [
   { id: "map", icon: "🛰", label: "Map" },
   { id: "scan", icon: "◎", label: "Scanner" },
   { id: "recon", icon: "⌁", label: "Recon" },
+  { id: "net", icon: "📶", label: "Internet" },
   { id: "harden", icon: "⛨", label: "OPSEC" },
 ];
 
@@ -43,11 +45,8 @@ export default {
     el.classList.add("t-full", "t-sec-spy");
     stopFades(); stopFades = edgeFades(el);
     el.innerHTML = `
-      <div class="spy-head">
-        <div class="spy-title"><span class="k">OPS</span><h1>Spy Tools</h1></div>
-        <div class="spy-tabs" role="tablist">
-          ${TABS.map(t => `<button class="spy-tab ${t.id === curTab ? "on" : ""}" data-tab="${t.id}" role="tab" aria-selected="${t.id === curTab}"><span class="i">${t.icon}</span>${esc(t.label)}</button>`).join("")}
-        </div>
+      <div class="spy-tabs" role="tablist">
+        ${TABS.map(t => `<button class="spy-tab ${t.id === curTab ? "on" : ""}" data-tab="${t.id}" role="tab" aria-selected="${t.id === curTab}"><span class="i">${t.icon}</span>${esc(t.label)}</button>`).join("")}
       </div>
       <div id="spyBody" class="spy-body"></div>`;
     const body = el.querySelector("#spyBody");
@@ -63,6 +62,9 @@ export default {
       } else if (id === "recon") {
         const d = document.createElement("div"); d.className = "spy-pane"; body.appendChild(d);
         cleanup = mountRecon(d, ctx) || (() => {});
+      } else if (id === "net") {
+        const d = document.createElement("div"); d.className = "spy-pane"; body.appendChild(d);
+        cleanup = mountNetHealth(d, ctx) || (() => {});
       } else if (id === "scan") {
         const r = document.createElement("div"); r.className = "spy-pane"; body.appendChild(r);
         const n = document.createElement("div"); n.className = "spy-pane spy-pane-gap"; body.appendChild(n);
@@ -101,23 +103,24 @@ function renderHarden(body, ctx) {
 (function () {
   if (document.getElementById("spy-css")) return;
   const s = document.createElement("style"); s.id = "spy-css"; s.textContent = `
-  .t-sec-spy .spy-head{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:flex-end;justify-content:space-between;padding:0 10px 4px}
-  .spy-title{display:flex;align-items:baseline;gap:12px}
-  .spy-title .k{font-family:var(--mono);font-size:11px;letter-spacing:3px;color:var(--accent);opacity:.8}
-  .spy-title h1{margin:0;font-size:clamp(22px,3.4vw,32px);font-weight:600;letter-spacing:.5px}
-  .spy-tabs{display:flex;gap:6px;flex-wrap:wrap}
-  .spy-tab{display:inline-flex;align-items:center;gap:7px;font-family:var(--font);font-size:13px;color:var(--ink-dim);cursor:pointer;
-    background:rgba(255,255,255,.04);border:1px solid var(--glass-line);border-radius:11px;padding:8px 14px;transition:.18s}
-  .spy-tab .i{font-size:15px;line-height:1;filter:grayscale(.3)}
-  .spy-tab:hover{color:var(--ink);background:rgba(var(--accent-rgb),.08)}
-  .spy-tab.on{color:#04121a;background:var(--accent);border-color:var(--accent);box-shadow:0 0 16px rgba(var(--accent-rgb),.5)}
-  .spy-tab.on .i{filter:none}
-  .spy-body{padding-top:14px}
+  /* sub-tabs: plain text + underline glow (no pill bubbles), single horizontally-scrollable row */
+  .spy-tabs{display:flex;gap:2px 20px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:0 10px;margin-bottom:2px;
+    -webkit-mask-image:linear-gradient(90deg,#000 94%,transparent);mask-image:linear-gradient(90deg,#000 94%,transparent)}
+  .spy-tabs::-webkit-scrollbar{display:none}
+  .spy-tab{position:relative;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-family:var(--font);font-size:14px;letter-spacing:.5px;
+    color:var(--ink-dim);cursor:pointer;background:none;border:0;padding:12px 4px;transition:color .18s}
+  .spy-tab .i{font-size:15px;line-height:1;opacity:.7}
+  .spy-tab:hover{color:var(--ink)}
+  .spy-tab.on{color:var(--ink)}
+  .spy-tab.on .i{opacity:1}
+  .spy-tab.on::after{content:"";position:absolute;left:4px;right:4px;bottom:4px;height:2px;border-radius:2px;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+  .spy-body{padding-top:12px}
   .spy-pane-gap{margin-top:22px}
 
   /* live map */
   .ops-map-wrap{padding-inline:10px}
   .ops-map-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+  .ops-map-bar>*{flex:0 0 auto}
   .ops-map-sp{flex:1 1 10px}
   .ops-tg{display:inline-flex;align-items:center;gap:6px;font-family:var(--font);font-size:12px;color:var(--ink-dim);cursor:pointer;
     background:rgba(255,255,255,.04);border:1px solid var(--glass-line);border-radius:9px;padding:6px 11px;transition:.16s}
@@ -128,6 +131,11 @@ function renderHarden(body, ctx) {
   .ops-src{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-dim)}
   .ops-src select{font-family:var(--font);font-size:12px;color:var(--ink);background:rgba(255,255,255,.04);border:1px solid var(--glass-line);border-radius:9px;padding:6px 8px}
   .ops-map{position:relative;height:min(66vh,620px);border-radius:16px;overflow:hidden;border:1px solid var(--glass-line);background:#05080f;box-shadow:inset 0 0 50px rgba(0,0,0,.6)}
+  .ops-map-off{position:absolute;inset:0;z-index:1200;display:grid;place-items:center;background:rgba(5,8,15,.55);pointer-events:none}
+  .ops-map-off[hidden]{display:none}
+  .ops-map-off-in{pointer-events:auto;display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center;padding:18px 22px;border-radius:14px;background:rgba(10,16,26,.92);border:1px solid var(--glass-line);box-shadow:0 8px 30px rgba(0,0,0,.5)}
+  .ops-map-off-in b{font-size:14px;color:var(--ink)}
+  .ops-map-off-in span{font-size:12px;color:var(--ink-dim)}
   .ops-scan-panel{margin:0 0 10px;padding:14px 16px;border:1px solid rgba(255,122,63,.4);border-radius:14px;background:rgba(255,122,63,.06)}
   .ops-scan-panel[hidden]{display:none}
   .ops-scan-head{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:#ffb98a;font-weight:600;margin-bottom:10px}
@@ -188,6 +196,11 @@ function renderHarden(body, ctx) {
   .check .txt>span{font-size:13px;color:var(--ink-dim);line-height:1.45}
   .check.on .txt b{color:#fff}
   @media(max-width:1100px){.ops-wrap{grid-template-columns:1fr}.ops-score{position:static}}
-  @media(max-width:700px){.ops-map{height:62vh}.spy-head{align-items:flex-start}}`;
+  @media(max-width:700px){
+    .ops-map-bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;-webkit-mask-image:linear-gradient(90deg,#000 93%,transparent);mask-image:linear-gradient(90deg,#000 93%,transparent)}
+    .ops-map-bar::-webkit-scrollbar{display:none}
+    .ops-map-sp{display:none}
+    .ops-map{height:calc(100dvh - 250px);min-height:320px}
+  }`;
   document.head.appendChild(s);
 })();

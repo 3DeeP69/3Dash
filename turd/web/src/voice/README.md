@@ -35,3 +35,14 @@ Set `window.TURD_VOICE_DEBUG = 1` to log `[voice] {text, nav, out}` for each com
 `tts.py` makes speech with espeak-ng (pip: espeakng-loader), `ui-wake.mjs` plays a WAV into Chromium's fake mic
 and logs wakes/commands, `cpu.mjs` measures worker CPU. Results 2026-10-21: 7/7 wakes, 0 false wakes,
 every "go to" correct, also with room noise and right after chatter.
+
+## Spoken briefing (briefing.js, speak.js)
+- `speak.js`: one shared voice for briefing, assistant and commands (`window.TURD_SPEAK`). It uses `TURD_NATIVE.tts.speak/stop`
+  if the app bridge has them, otherwise speechSynthesis. The wake gate pauses while it talks.
+- `briefing.js` (started by wake.js init): a "🔈 Play briefing · Read at login Off/On" control injected under Home's greeting
+  (`.hm-top > div:first-child`, `[data-brief-ctl]`). Muted by default (`turd_brief_auto`). If it's on, it reads after login
+  once the boot chime is over (1.7 s) and Home has its numbers (up to 6 s).
+- Text: `window.TURD_HOME.briefing()` / `.pcLine()` if Home provides them, otherwise Home's on-screen sentence, otherwise the
+  assistant's offline briefing (`assistant/local.js` `briefing()`). It's rewritten for the ear (°, %, ·).
+- "Hey T.U.R.D., read my briefing" / "brief me" plays it. Esc, tapping Stop, or hiding the app stops it.
+- `window.TURD_BRIEF = { play, stop, playing, auto, setAuto, compose }`.

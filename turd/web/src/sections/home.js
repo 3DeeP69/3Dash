@@ -12,10 +12,11 @@ import { wxIcon } from "./icons.js";
 import * as WX from "./wxdata.js";
 import logbook, { quickAdd, CATS } from "./logbook.js";
 import projects from "./projects.js";
-import { fetchStats, stripHTML } from "./pcstat.js";
+import { fetchStats, livePaint } from "./pcstat.js";
 import { devStripHTML, fetchDevices } from "./devstat.js";   // Fold status via device sync (Device-sync thread)
 import { registerCard, getCard, onCards, getLayout, saveLayout, follows, setFollow, resetLayout } from "./homecards.js";
-import { registerBatteries } from "./btbat.js";              // gadget batteries: only when the native app reports one
+import { registerBatteries } from "./btbat.js";
+import "./netcard.js";                                      // internet health: only when the PC server reports it              // gadget batteries: only when the native app reports one
 
 const plain = s=> String(s).replace(/\*\*(.+?)\*\*/g,"$1").replace(/`([^`]+)`/g,"$1");
 // Optional community calendar (built by another thread). Missing file → silently skipped.
@@ -52,7 +53,7 @@ function sentence(w, lg, pj, ev){
 }
 
 function wxTile(w){
-  if(!w) return `<div class="hm-tile hm-wx t-tilt" data-go="weather"><div class="t-k">Weather</div><div class="t-loading sm"><i></i><i></i><i></i></div></div>`;
+  if(!w) return `<div class="hm-tile hm-wx t-tilt" data-go="weather"><div class="t-k">Weather</div>${wxFail?failHTML("Weather"):`<div class="t-loading sm"><i></i><i></i><i></i></div>`}</div>`;
   return `<div class="hm-tile hm-wx t-tilt" data-go="weather">
     <div class="t-k">Weather · ${K.esc(w.loc)}</div>
     <div class="hm-wx-now">${wxIcon(w.kind,w.isDay,86)}<div><div class="hm-big"><span id="hmT">0</span>°</div><div class="t-s">${K.esc(w.label)}</div></div></div>
@@ -82,7 +83,7 @@ function todayTile(lg){
 }
 
 function pjTile(pj){
-  if(!pj) return `<div class="hm-tile hm-pj t-tilt" data-go="projects"><div class="t-k">Projects</div><div class="t-loading sm"><i></i><i></i><i></i></div></div>`;
+  if(!pj) return `<div class="hm-tile hm-pj t-tilt" data-go="projects"><div class="t-k">Projects</div>${pjFail?failHTML("Projects"):`<div class="t-loading sm"><i></i><i></i><i></i></div>`}</div>`;
   return `<div class="hm-tile hm-pj t-tilt" data-go="projects">
     <div class="t-k">Projects</div>
     <div class="hm-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" class="bg"/>
@@ -95,20 +96,31 @@ function pjTile(pj){
 
 /* ------------------------------------------------------------ data → cards */
 let lastW=null,lastLg=null,lastPj=null;
+let wxFail=false, pjFail=false;
+const failHTML = what=>`<div class="t-s hm-fail">${what} unavailable right now.</div><button class="hm-go" data-retry>Retry ▸</button>`;
 async function render(){
   lastLg=logbook.summary(K);
   if(!lastW) lastW=WX.brief(WX.cached());
   refreshAll();
-  const [w,pj]=await Promise.allSettled([WX.load(K.http).then(WX.brief), projects.summary(K)]);
+  // a hung or offline fetch must never leave loading dots up forever: give up after 12 s, keep what we had
+  const to=(p,ms=12000)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error("timeout")),ms))]);
+  const [w,pj]=await Promise.allSettled([to(WX.load(K.http).then(WX.brief)), to(projects.summary(K))]);
+  wxFail=w.status!=="fulfilled"; pjFail=pj.status!=="fulfilled";
   if(!panel) return;
   if(w.status==="fulfilled") lastW=w.value;
-  lastLg=logbook.summary(K); lastPj=pj.status==="fulfilled"?pj.value:null;
+  lastLg=logbook.summary(K); if(!pjFail) lastPj=pj.value;
   refreshAll();
 }
 const refresh = (...ids)=> ids.forEach(id=>{ try{ live.get(id)?.handle?.refresh?.(); }catch(e){ console.warn("[home] card",id,e); } });
 function refreshAll(){ if(!panel) return; live.forEach((c,id)=>refresh(id)); stopTilt(); stopTilt=editing?()=>{}:tilt(panel,".hm-tile",6); }
 
-const goLinks = el=> $$("[data-go]",el).forEach(n=>n.addEventListener("click",e=>{ if(editing||e.target.closest("input,select,a,.hm-task")) return; e.stopPropagation(); K.show(n.dataset.go); }));
+const goLinks = el=>{ $$("[data-retry]",el).forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); if(editing) return; wxFail=pjFail=false; refresh("weather","projects"); render(); })); goLinks0(el); };
+const goLinks0 = el=> $$("[data-go]",el).forEach(n=>{
+  n.addEventListener("click",e=>{ if(editing||e.target.closest("input,select,a,.hm-task,[data-retry]")) return; e.stopPropagation(); K.show(n.dataset.go); });
+  if(!n.matches("a,button")){   // tiles are divs: make them reachable by Tab and the controller, Enter/Space opens
+    n.tabIndex=0; n.setAttribute("role","link"); n.setAttribute("aria-label",`Open ${n.dataset.go}`);
+    n.addEventListener("keydown",e=>{ if(e.target!==n || (e.key!=="Enter"&&e.key!==" ")) return; e.preventDefault(); n.click(); });
+  } });
 
 /* ------------------------------------------------------------ built-in cards */
 registerCard({ id:"brief", label:"Greeting & briefing", icon:"☀", kind:"strip", order:10,
@@ -119,7 +131,7 @@ registerCard({ id:"brief", label:"Greeting & briefing", icon:"☀", kind:"strip"
     paint(); return { refresh:paint }; } });
 
 registerCard({ id:"pc", label:"PC status", icon:"▤", kind:"strip", order:20, admin:true,
-  mount(b){ b.id="hmPc"; const paint=()=>{ b.innerHTML=stripHTML(pcLast, K.esc); }; paint(); return { refresh:paint }; } });
+  mount(b){ b.id="hmPc"; const paint=()=>livePaint(b, pcLast, K.esc); paint(); return { refresh:paint }; } });
 
 registerCard({ id:"fold", label:"Fold status", icon:"▯", kind:"strip", order:25,
   mount(b){ b.id="hmDev"; const paint=()=>{ b.innerHTML=devStripHTML(K.esc); }; paint(); return { refresh:paint }; } });
@@ -433,17 +445,30 @@ function startPad(){ if(!padRaf && navigator.getGamepads && [...navigator.getGam
 addEventListener("gamepadconnected",()=>{ if(panel) startPad(); });
 
 let stopFades=()=>{};
-/* PC status strip: admin only, polls every 10s while Home is on screen */
-let pcLast=null, pcT=0;
+/* PC status strip: admin only, near-live (~1.5 s; 2 s on touch devices) while Home is actually on screen.
+   One request at a time, so a slow network never stacks calls. Fold status keeps its own 10 s pace. */
+let pcLast=null, pcT=0, pcBusy=false, devAt=0;
+const PC_MS = matchMedia("(hover: none)").matches ? 2000 : 1500;
 async function pcPoll(){
-  if(!panel || document.hidden || K.session?.role!=="admin") return;
-  pcLast=await fetchStats();
-  refresh("pc");
-  await fetchDevices(); devPaint();
+  if(!panel || pcBusy || document.hidden || K.session?.role!=="admin" || !panel.offsetParent) return;
+  pcBusy=true;
+  try{
+    pcLast=await fetchStats(); refresh("pc");
+    if(Date.now()-devAt>10e3){ devAt=Date.now(); await fetchDevices(); devPaint(); }
+  }finally{ pcBusy=false; }
 }
 const devPaint = ()=> refresh("fold");
 
 const onMQ=()=>{ if(panel) place(); };
+/* for the spoken login briefing (voice/briefing.js): plain-text versions of what Home shows */
+const toText = h=>{ const d=document.createElement("div"); d.innerHTML=h||""; return d.textContent.replace(/\s+/g," ").trim(); };
+window.TURD_HOME = {
+  briefing(){ return K ? toText(sentence(lastW,lastLg,lastPj,nextEvent)) : ""; },
+  pcLine(){ const d=pcLast?.state==="ok"&&pcLast.d; if(!d) return "";
+    const bits=[]; if(d.cpu?.pct!=null) bits.push(`${d.cpu.pct} percent CPU`); if(d.gpu?.tempC!=null) bits.push(`GPU at ${d.gpu.tempC} degrees`);
+    if(d.ram?.pct!=null) bits.push(`memory ${d.ram.pct} percent used`);
+    return bits.length?`Your PC is at ${bits.join(", ")}${d.ollama?.up?", and the assistant model is up":""}.`:""; },
+};
 export default {
   id:"home", icon:"⌂", label:"Home",
   theme:{ accent:"#2f8cff", accent2:"#0050d0", rgb:"47,140,255", bg:"#020a1c", bg2:"#06173a" },
@@ -457,7 +482,7 @@ export default {
     mq.addEventListener?.("change",onMQ);
     clearInterval(clock); clock=setInterval(tick, 1000*15);
     clearInterval(refreshT); refreshT=setInterval(render, 10*60e3);
-    pcPoll(); clearInterval(pcT); pcT=setInterval(pcPoll, 10e3);
+    devAt=0; pcPoll(); clearInterval(pcT); pcT=setInterval(pcPoll, PC_MS);
     startPad(); },
   unmount(){
     if(editing){ if(held) drop(false); editing=false; window.TURD_OVERLAY=false; removeEventListener("keydown",onEditKey,true); }

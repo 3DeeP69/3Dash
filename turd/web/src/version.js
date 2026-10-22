@@ -11,17 +11,15 @@
 // ===========================================================================
 (function(){
   "use strict";
-  var VERSION = "1.2.0";
+  var VERSION = "1.4.0";
   var DATE = "2026-10-22";
   var NOTES = [
-    "Device sync between the PC and the Fold4",
-    "\"Hey T.U.R.D.\" hands-free voice, offline",
-    "Play tab: launch Steam, Epic and GOG games, plus Now Playing",
-    "Home: PC status card, and a Fold4 status strip on the PC",
-    "\"Before you go\" recap when you log out",
-    "Quick Drop: send links, notes and files between your devices",
-    "Wi-Fi scanner fixed; chat finds your PC by itself; Wake PC",
-    "Entertainment \"handler error\" fixed; new deep-space login"
+    "Controller: D-pad or stick moves through every section (A select, B back, bumpers switch sections)",
+    "Clearer keyboard focus; Tab reaches the Home tiles and Projects cards, and never the hidden login",
+    "Offline: tiles and the Spy map say \"unavailable · Retry\" instead of spinning forever",
+    "Clearer mic messages: \"No microphone found\" / \"Mic is busy in another app\"",
+    "Short screens and Fold cover: tidier layout; nothing slides under the bars",
+    "Faster and lighter: Weather renders 40–55% quicker, and idle sections pause"
   ];
 
   var info = { version: VERSION, web: VERSION, date: DATE, notes: NOTES, platform: "web" };

@@ -1,6 +1,6 @@
 [package]
 name = "turd"
-version = "1.2.0"
+version = "1.4.0"
 description = "T.U.R.D. — Totally Unreliable & Really Dumb. A 3D helmet-HUD dashboard."
 authors = ["Bossman"]
 edition = "2021"

@@ -13,17 +13,21 @@
 //     ollama: { up, version, models:[loaded model names] },
 //     chat: { up:true, online:<connected users> } }
 //
-// Cost: CPU is sampled from os.cpus() deltas only while someone is looking (a
-// request in the last 60s); GPU/Ollama/disk results are cached 10-15s; a GPU
-// tool that isn't installed is not retried for 10 minutes.
+// Near-live (Home polls ~every 1.5 s) but light on a low-end PC:
+//   · CPU: os.cpus() deltas every 1 s, only while someone looked in the last 20 s
+//   · GPU: ONE long-running `nvidia-smi -lms 1500` while watched (no process spawn
+//     per poll); else LibreHardwareMonitor's local web server, cached 2 s
+//   · Ollama 5 s, disk 30 s; concurrent callers (PC + Fold) share one read
+//   · a GPU tool that isn't installed is not retried for 10 minutes
 // ===========================================================================
 "use strict";
 const os = require("os");
 const fs = require("fs");
 const http = require("http");
-const { execFile } = require("child_process");
+const { execFile, spawn } = require("child_process");
 
 /* ---------------- CPU: rolling delta of os.cpus() times ---------------- */
+const IDLE = 20e3;
 let cpuPrev = null, cpuPct = null, cpuTimer = null, lastAsk = 0;
 function cpuTimes() {
   let idle = 0, total = 0;
@@ -37,21 +41,22 @@ function cpuTick() {
     if (dt > 0) cpuPct = Math.max(0, Math.min(100, Math.round((1 - di / dt) * 100)));
   }
   cpuPrev = now;
-  if (Date.now() - lastAsk > 60e3) { clearInterval(cpuTimer); cpuTimer = null; cpuPrev = null; }   // nobody watching: stop
+  if (Date.now() - lastAsk > IDLE) { clearInterval(cpuTimer); cpuTimer = null; cpuPrev = null; stopSmi(); }   // nobody watching: stop
 }
 function wakeCpu() {
   lastAsk = Date.now();
-  if (!cpuTimer) { cpuTick(); cpuTimer = setInterval(cpuTick, 2000); cpuTimer.unref && cpuTimer.unref(); }
+  if (!cpuTimer) { cpuTick(); cpuTimer = setInterval(cpuTick, 1000); cpuTimer.unref && cpuTimer.unref(); }
 }
 
 /* ---------------- tiny helpers ---------------- */
-const cache = new Map();
+const cache = new Map(), inflight = new Map();
 async function cached(key, ttl, fn) {
   const c = cache.get(key);
   if (c && Date.now() - c.t < ttl) return c.v;
-  const v = await fn().catch(() => null);
-  cache.set(key, { t: Date.now(), v });
-  return v;
+  if (inflight.has(key)) return inflight.get(key);          // PC + Fold polling at once share one read
+  const p = fn().catch(() => null).then(v => { cache.set(key, { t: Date.now(), v }); inflight.delete(key); return v; });
+  inflight.set(key, p);
+  return p;
 }
 function getJSON(url, ms = 1500) {
   return new Promise((res, rej) => {
@@ -79,16 +84,40 @@ async function disk() {
 }
 
 /* ---------------- GPU: nvidia-smi, else LibreHardwareMonitor (free, optional) ---------------- */
-let smiMissingUntil = 0;
+let smiMissingUntil = 0, smi = null, smiLast = null;
+function parseSmi(line) {
+  const [t, u, ...name] = String(line).split(",").map(s => s.trim());
+  return t && !isNaN(+t) ? { tempC: +t, pct: isNaN(+u) ? null : +u, name: name.join(",").trim(), src: "nvidia-smi" } : null;
+}
+// one nvidia-smi that prints a line every 1.5 s while someone is watching, instead of a spawn per poll
+function startSmi() {
+  if (smi || Date.now() < smiMissingUntil) return;
+  try {
+    smi = spawn("nvidia-smi", ["--query-gpu=temperature.gpu,utilization.gpu,name", "--format=csv,noheader,nounits", "-lms", "1500"], { windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+  } catch (e) { smi = null; smiMissingUntil = Date.now() + 10 * 60e3; return; }
+  let buf = "";
+  smi.stdout.setEncoding("utf8");
+  smi.stdout.on("data", d => { buf += d; let i; while ((i = buf.indexOf("\n")) >= 0) { const g = parseSmi(buf.slice(0, i)); buf = buf.slice(i + 1); if (g) smiLast = { ...g, t: Date.now() }; } if (buf.length > 4096) buf = ""; });
+  smi.on("error", () => { smiMissingUntil = Date.now() + 10 * 60e3; smi = null; smiLast = null; });
+  smi.on("exit", () => { smi = null; });
+}
+function stopSmi() { if (smi) { try { smi.kill(); } catch (e) {} smi = null; } }
+process.on("exit", stopSmi);
 async function gpu() {
   if (Date.now() > smiMissingUntil) {
-    try {
-      const out = await run("nvidia-smi", ["--query-gpu=temperature.gpu,utilization.gpu,name", "--format=csv,noheader,nounits"]);
-      const [t, u, ...name] = out.split("\n")[0].split(",").map(s => s.trim());
-      if (t && !isNaN(+t)) return { tempC: +t, pct: isNaN(+u) ? null : +u, name: name.join(",").trim(), src: "nvidia-smi" };
-    } catch (e) { smiMissingUntil = Date.now() + 10 * 60e3; }
+    startSmi();
+    if (smiLast && Date.now() - smiLast.t < 5000) { const { t, ...g } = smiLast; return g; }
+    if (!smiLast) {                                            // first look: one quick read so the card isn't blank
+      try { const g = parseSmi((await run("nvidia-smi", ["--query-gpu=temperature.gpu,utilization.gpu,name", "--format=csv,noheader,nounits"])).split("\n")[0]); if (g) { smiLast = { ...g, t: Date.now() }; return g; } }
+      catch (e) { smiMissingUntil = Date.now() + 10 * 60e3; stopSmi(); }
+    }
   }
-  // LibreHardwareMonitor → Options → Remote Web Server (port 8085) exposes /data.json
+  // LibreHardwareMonitor → Options → Remote Web Server (port 8085) exposes /data.json (a big tree: read at most every 3 s)
+  if (lhmLast && Date.now() - lhmLast.t < 3000) return lhmLast.v;
+  const v = await lhm(); lhmLast = { t: Date.now(), v }; return v;
+}
+let lhmLast = null;
+async function lhm() {
   try {
     const j = await getJSON("http://127.0.0.1:8085/data.json", 1200);
     let best = null;
@@ -125,7 +154,7 @@ function attach(api, { readToken, bearer, send, online }) {
     wakeCpu();
     if (firstLook) await new Promise(r => setTimeout(r, 400));   // first sample needs a short window
     if (firstLook) cpuTick();
-    const [d, g, o] = await Promise.all([cached("disk", 15e3, disk), cached("gpu", 10e3, gpu), cached("ollama", 10e3, ollama)]);
+    const [d, g, o] = await Promise.all([cached("disk", 30e3, disk), cached("gpu", 1200, gpu), cached("ollama", 5e3, ollama)]);
     const tot = os.totalmem(), free = os.freemem();
     const cpus = os.cpus();
     send(res, 200, {
