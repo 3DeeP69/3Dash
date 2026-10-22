@@ -1,0 +1,13 @@
+import { chromium } from "playwright";
+import http from "http"; import fs from "fs"; import path from "path";
+const root = process.argv[2];
+const srv = http.createServer((q, r) => { const p = path.join(root, decodeURIComponent(q.url.split("?")[0])); if (!fs.existsSync(p) || fs.statSync(p).isDirectory()) { r.writeHead(404); return r.end(); } r.writeHead(200, { "content-type": p.endsWith(".js") ? "text/javascript" : p.endsWith(".html") ? "text/html" : "application/octet-stream" }); fs.createReadStream(p).pipe(r); }).listen(40555);
+const b = await chromium.launch(); const pg = await b.newPage();
+pg.on("console", m => console.log("console:", m.text().slice(0, 200)));
+fs.writeFileSync(path.join(root, "vt.html"), "<html><body><script src='/vendor/vosk/vosk.js'></script></body></html>");
+await pg.goto("http://127.0.0.1:40555/vt.html");
+const t0 = Date.now();
+const r = await pg.evaluate(async () => { try { const m = await Vosk.createModel("/vendor/vosk/en-us-small-0.15.tgz", -1); const rec = new m.KaldiRecognizer(16000); return "model ready, recognizer " + typeof rec; } catch (e) { return "ERR " + e; } });
+console.log(r, (Date.now() - t0) + " ms");
+fs.unlinkSync(path.join(root, "vt.html"));
+await b.close(); srv.close();

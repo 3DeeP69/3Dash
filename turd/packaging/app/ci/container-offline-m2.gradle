@@ -1,0 +1,15 @@
+// Container-only: Google's Maven host is blocked here, so Google artifacts come from
+// a local mirror (/opt/m2local) and Maven Central from repo1 (repo.maven.apache.org rate-limits).
+def LOCAL = "file:///opt/m2local"
+def CENTRAL = "https://repo1.maven.org/maven2"
+def patch = { RepositoryHandler repos ->
+  repos.configureEach { r ->
+    if (r instanceof MavenArtifactRepository) {
+      def u = r.url.toString()
+      if (u.contains("dl.google.com") || u.contains("maven.google.com")) r.url = LOCAL
+      else if (u.contains("repo.maven.apache.org") || u.contains("plugins.gradle.org")) r.url = CENTRAL
+    }
+  }
+}
+beforeSettings { s -> patch(s.pluginManagement.repositories); patch(s.dependencyResolutionManagement.repositories) }
+allprojects { p -> patch(p.buildscript.repositories); patch(p.repositories) }

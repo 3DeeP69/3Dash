@@ -1,0 +1,20 @@
+// node cpu.mjs <wav> <on|off>
+import { createRequire } from "module"; const require = createRequire("/opt/node22/lib/node_modules/"); const { chromium } = require("playwright");
+import fs from "fs"; import { execSync } from "child_process";
+const [wav, on] = process.argv.slice(2);
+const THREE = fs.readFileSync("deps/node_modules/three/build/three.module.js");
+const b = await chromium.launch({ args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", "--use-file-for-fake-audio-capture=" + wav] });
+const pg = await b.newPage({ viewport: { width: 1280, height: 800 } });
+await pg.route(/^https?:\/\/(?!127\.0\.0\.1|localhost).*/, r => r.request().url().includes("three") ? r.fulfill({ body: THREE, contentType: "text/javascript" }) : r.abort());
+await pg.addInitScript(on => { localStorage.setItem("turd_users", JSON.stringify({ admin: { pw: "admin", fresh: false, role: "admin" } })); localStorage.setItem("turd_voice_on", on === "on" ? "true" : "false"); localStorage.setItem("turd_quality", '"LOW"'); }, on);
+await pg.goto("http://127.0.0.1:8799/"); await pg.fill("#p", "admin"); await pg.press("#p", "Enter");
+await pg.waitForTimeout(4000);
+if (on === "on") await pg.waitForFunction(() => window.TURD_VOICE?.state === "listening", null, { timeout: 60000 });
+await pg.click('.navbtn[data-go="logbook"]'); await pg.waitForTimeout(4000);
+const pids = () => execSync("pgrep -f chrom || true").toString().trim().split("\n").filter(Boolean);
+const ticks = () => { const o = {}; for (const p of pids()) { let ts = []; try { ts = fs.readdirSync(`/proc/${p}/task`); } catch (e) {} for (const t of ts) { try { const comm = fs.readFileSync(`/proc/${p}/task/${t}/comm`, "utf8").trim(); if (!/Worker|Audio|Worklet/i.test(comm)) continue; const f = fs.readFileSync(`/proc/${p}/task/${t}/stat`, "utf8").split(") ")[1].split(" "); o[comm] = (o[comm] || 0) + (+f[11]) + (+f[12]); } catch (e) {} } } return o; };
+const t1 = ticks(), w1 = Date.now(); await pg.waitForTimeout(20000); const t2 = ticks(), w2 = Date.now();
+const wakes = await pg.evaluate(() => window.__w || 0);
+const secs = (w2 - w1) / 1000; const rows = Object.keys(t2).map(k => `${k}=${(((t2[k] - (t1[k] || 0)) / 100) / secs * 100).toFixed(1)}%`).join(" ");
+console.log(`${wav.split("/").pop()} voice=${on}: ${rows} state=${await pg.evaluate(() => window.TURD_VOICE?.state)}`);
+await b.close();

@@ -1,0 +1,53 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+    
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.10.1'
+
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+apply from: "variables.gradle"
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+// library annotation extraction needs the lint jars, which add nothing to an app build
+// (the empty typedef recipe it would have produced is created up front for the jar task)
+subprojects { p ->
+    p.tasks.matching { it.name ==~ /extract.*Annotations/ }.configureEach { enabled = false }
+    p.tasks.matching { it.name ==~ /sync.*LibJars/ }.configureEach { t ->
+        def v = t.name.replace("sync", "").replace("LibJars", "")
+        def f = p.file("build/intermediates/annotations_typedef_file/${v.uncapitalize()}/extract${v}Annotations/typedefs.txt")
+        t.doFirst { }
+        f.parentFile.mkdirs(); if (!f.exists()) f.text = ""
+    }
+}
+
+// one AndroidX graph for every module (the Cordova bridge asks for slightly older pins)
+allprojects {
+    configurations.configureEach {
+        resolutionStrategy {
+            force "androidx.webkit:webkit:1.14.0"
+            force "androidx.annotation:annotation:1.8.1"
+            force "androidx.annotation:annotation-jvm:1.8.1"
+            force "androidx.core:core:1.13.0"
+            force "androidx.appcompat:appcompat:1.7.1"
+        }
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}

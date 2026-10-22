@@ -1,0 +1,53 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "T.U.R.D.",
+  "version": "1.1.0",
+  "identifier": "app.turd.hud",
+  "build": {
+    "frontendDist": "../dist",
+    "beforeBuildCommand": "",
+    "beforeDevCommand": ""
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "T.U.R.D.",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600,
+        "maximized": true,
+        "center": true,
+        "backgroundColor": "#03060d",
+        "dragDropEnabled": false,
+        "visible": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "publisher": "T.U.R.D.",
+    "category": "Utility",
+    "shortDescription": "3D helmet-HUD dashboard",
+    "longDescription": "T.U.R.D. (Totally Unreliable & Really Dumb): an at-a-glance 3D helmet-HUD dashboard with weather, projects, logbook, chat, radar, entertainment, assistant and offline extras.",
+    "copyright": "T.U.R.D.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "externalBin": ["binaries/turd-server"],
+    "resources": { "../dist/": "web/" },
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico"
+      },
+      "wix": { "language": "en-US" }
+    }
+  }
+}

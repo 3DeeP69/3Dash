@@ -1,0 +1,25 @@
+import { chromium } from "playwright"; import fs from "fs"; import path from "path"; import http from "http";
+const root=process.argv[2]; const THREE=fs.readFileSync("../deps/node_modules/three/build/three.module.js");
+const srv=http.createServer((q,r)=>{ let p=q.url.split("?")[0]; if(p.endsWith("/")) p+="index.html"; fs.readFile(path.join(root,p),(e,d)=>{ if(e){r.writeHead(404);r.end();return;} r.writeHead(200,{"content-type":p.endsWith(".js")?"text/javascript":p.endsWith(".css")?"text/css":"text/html"}); r.end(d);});});
+await new Promise(r=>srv.listen(0,r)); const URL=`http://127.0.0.1:${srv.address().port}/`;
+const b=await chromium.launch({args:["--use-gl=swiftshader"]}); const errs=[];
+async function login(vp,user,pw,role){ const ctx=await b.newContext({viewport:vp}); const pg=await ctx.newPage(); pg.on("pageerror",e=>errs.push(e.message));
+  await pg.route(/^https?:\/\/(?!127).*/,r=>r.request().url().includes("three")?r.fulfill({body:THREE,contentType:"text/javascript"}):r.abort());
+  await pg.addInitScript(()=>{ if(!sessionStorage.getItem("seeded")){ sessionStorage.setItem("seeded","1"); localStorage.setItem("turd_users",JSON.stringify({admin:{pw:"admin",fresh:false,role:"admin"},guest:{pw:"guest",fresh:false,role:"user"}})); } });
+  await pg.goto(URL); await pg.fill("#u",user); await pg.fill("#p",pw); await pg.click("#loginForm button"); await pg.waitForSelector(".navbtn.active"); await pg.waitForTimeout(400); return pg; }
+let pg=await login({width:1600,height:900},"admin","admin");
+console.log("admin sees Access log:", !!await pg.$("#stAudit"), "| Lock:", !!await pg.$("#stLock"));
+await pg.click("#stAudit"); await pg.waitForTimeout(200); console.log("modal opens:", await pg.$eval("#modal",m=>m.classList.contains("show"))); await pg.keyboard.press("Escape");
+await pg.screenshot({path:"../ux-desk.png",clip:{x:0,y:0,width:1600,height:70}});
+await pg.click('.navbtn[data-go="weather"]'); await pg.waitForTimeout(500); await pg.keyboard.press("]"); await pg.waitForTimeout(300); const a1=await pg.$eval(".navbtn.active",e=>e.dataset.go);
+await pg.keyboard.press("PageDown"); await pg.waitForTimeout(300); const a2=await pg.$eval(".navbtn.active",e=>e.dataset.go);
+await pg.keyboard.press("["); await pg.waitForTimeout(300); const a3=await pg.$eval(".navbtn.active",e=>e.dataset.go);
+console.log("] ->",a1,"PageDown ->",a2,"[ ->",a3);
+await pg.click('.navbtn[data-go="logbook"]'); await pg.waitForTimeout(800); await pg.click("#lgIn"); await pg.keyboard.type("audit the ] list"); await pg.waitForTimeout(200);
+console.log("typing 'audit' + ']' in textarea -> modal:", await pg.$eval("#modal",m=>m.classList.contains("show")), "section:", await pg.$eval(".navbtn.active",e=>e.dataset.go));
+await pg.click("#stLock"); await pg.waitForTimeout(1200); console.log("after Lock, login visible:", await pg.isVisible("#loginForm"), "navbtns:", await pg.$$eval(".navbtn",x=>x.length));
+pg=await login({width:344,height:882},"guest","guest");
+console.log("guest sees Access log:", !!await pg.$("#stAudit"), "| Lock:", !!await pg.$("#stLock"));
+await pg.screenshot({path:"../ux-cover.png",clip:{x:0,y:0,width:344,height:120}});
+pg=await login({width:344,height:882},"admin","admin"); await pg.screenshot({path:"../ux-cover-admin.png",clip:{x:0,y:0,width:344,height:120}});
+console.log("errors:",errs); await b.close(); srv.close();

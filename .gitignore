@@ -1,0 +1,25 @@
+# T.U.R.D. — never commit: signing keys, server data (accounts, chat, secrets), build output
+*.jks
+*.keystore
+*.pfx
+keystore.properties
+turd/packaging/app/keys/
+turd/server/data/
+node_modules/
+turd/packaging/app/dist/
+turd/packaging/app/build/
+turd/packaging/app/vendor-cache/
+turd/packaging/app/src-tauri/target/
+turd/packaging/app/src-tauri/binaries/
+turd/packaging/app/android/app/build/
+turd/packaging/app/android/build/
+turd/packaging/app/android/.gradle/
+turd/packaging/app/android/app/src/main/assets/public/
+turd/packaging/app/tests/out/
+turd/releases/v*/
+turd/releases/_*/
+turd/downloads/
+turd/screenshots/
+*.apk
+*.exe
+*.msi

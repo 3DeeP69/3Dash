@@ -1,0 +1,36 @@
+# T.U.R.D. uplink — Render Blueprint.
+# On Render: New ▸ Blueprint ▸ pick this repo. It creates one free web service
+# that runs the chat/calendar server AND serves the web app at the same URL.
+#
+# Free tier notes (render.com/docs/free):
+#   • WebSockets work (chat + live calendar sync are fine).
+#   • The service SLEEPS after 15 min idle and takes ~1 min to wake on the next visit.
+#   • Free has NO persistent disk, so accounts / chat history / calendar reset on
+#     every deploy or restart. For durable data, switch `plan: free` to `plan: starter`
+#     ($7/mo) and uncomment the `disk:` block below — nothing else changes.
+services:
+  - type: web
+    name: turd-uplink
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: "true"            # zero dependencies — nothing to build
+    startCommand: "node server.js"
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: STATIC_DIR
+        value: ../web               # also serve the web app from this URL
+      - key: GEOIP
+        value: "1"                  # location in the admin log (Bossman wants this)
+      - key: OPEN_SIGNUP
+        value: "0"                  # invite-only; admin creates operators
+      - key: ADMIN_PASSWORD
+        sync: false                 # Render prompts you to set your admin passkey at deploy
+      # - key: DATA_DIR             # uncomment with the disk below for persistence
+      #   value: /var/data
+    # --- Persistence (paid plans only). Uncomment with plan: starter for durable data. ---
+    # disk:
+    #   name: turd-data
+    #   mountPath: /var/data
+    #   sizeGB: 1

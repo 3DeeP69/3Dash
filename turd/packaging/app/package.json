@@ -1,0 +1,25 @@
+{
+  "name": "turd-app",
+  "version": "1.1.0",
+  "description": "T.U.R.D. native apps: Windows (Tauri) + Android (Capacitor)",
+  "scripts": {
+    "postinstall": "node scripts/patch-capacitor.mjs",
+    "web": "node scripts/prepare-web.mjs",
+    "android:sync": "npm run web && npx cap sync android && node scripts/patch-capacitor.mjs",
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleRelease",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "three": "^0.160.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.3",
+    "esbuild": "^0.28.2",
+    "playwright": "^1.56.1",
+    "postject": "^1.0.0-alpha.6"
+  }
+}

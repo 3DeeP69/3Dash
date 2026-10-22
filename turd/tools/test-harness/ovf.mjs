@@ -1,0 +1,14 @@
+import { chromium } from "playwright"; import fs from "fs"; import path from "path"; import http from "http";
+const [,,root,sec,w,h]=process.argv; const THREE=fs.readFileSync("../deps/node_modules/three/build/three.module.js");
+const srv=http.createServer((q,r)=>{ let p=q.url.split("?")[0]; if(p.endsWith("/")) p+="index.html"; fs.readFile(path.join(root,p),(e,d)=>{ if(e){r.writeHead(404);r.end();return;} r.writeHead(200,{"content-type":p.endsWith(".js")?"text/javascript":p.endsWith(".css")?"text/css":"text/html"}); r.end(d);});});
+await new Promise(r=>srv.listen(0,r));
+const b=await chromium.launch({args:["--use-gl=swiftshader"]}); const pg=await b.newPage({viewport:{width:+w,height:+h}});
+await pg.route(/^https?:\/\/(?!127).*/,r=>r.request().url().includes("three")?r.fulfill({body:THREE,contentType:"text/javascript"}):r.abort());
+await pg.addInitScript(()=>localStorage.setItem("turd_users",JSON.stringify({admin:{pw:"admin",fresh:false,role:"admin"}})));
+await pg.goto(`http://127.0.0.1:${srv.address().port}/`); await pg.fill("#p","admin"); await pg.click("#loginForm button");
+await pg.waitForSelector(".navbtn"); await pg.click(`.navbtn[data-go="${sec}"]`); await pg.waitForTimeout(1500);
+console.log(JSON.stringify(await pg.evaluate(()=>{ const root=document.querySelector(".as-root"), rr=root.getBoundingClientRect(); const out=[];
+  root.querySelectorAll("*").forEach(e=>{ const cs=getComputedStyle(e); const L=e.offsetLeft+e.offsetWidth; const r=e.getBoundingClientRect();
+    if(e.offsetParent===root && L>root.clientWidth) out.push({el:e.tagName+"."+e.className, L, r:Math.round(r.right), pos:cs.position, tf:cs.transform, vis:cs.visibility, op:cs.opacity}); });
+  return out; }),null,1));
+await b.close(); srv.close();

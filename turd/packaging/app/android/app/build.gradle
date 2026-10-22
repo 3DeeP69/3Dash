@@ -1,0 +1,92 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace = "app.turd.hud"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "app.turd.hud"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode = Integer.parseInt(System.getenv("TURD_VERSION_CODE") ?: "1")
+        versionName = System.getenv("TURD_VERSION") ?: "1.0.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    // Release signing: keys/keystore.properties (self-signed for now) or the
+    // TURD_KEYSTORE / TURD_KEYSTORE_PASSWORD / TURD_KEY_ALIAS / TURD_KEY_PASSWORD env vars (CI).
+    def ksProps = new Properties()
+    def ksFile = rootProject.file("../keys/keystore.properties")
+    if (ksFile.exists()) ksFile.withInputStream { ksProps.load(it) }
+    signingConfigs {
+        release {
+            def envStore = System.getenv("TURD_KEYSTORE")
+            if (envStore) {
+                storeFile file(envStore)
+                storePassword System.getenv("TURD_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("TURD_KEY_ALIAS")
+                keyPassword System.getenv("TURD_KEY_PASSWORD")
+            } else if (ksProps.storeFile) {
+                storeFile rootProject.file("app/" + ksProps.storeFile)
+                storePassword ksProps.storePassword
+                keyAlias ksProps.keyAlias
+                keyPassword ksProps.keyPassword
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    lint { checkReleaseBuilds false; abortOnError false }
+    packagingOptions {
+        // the web bundle is already compressed where it matters (woff2, min.js); keep APK install fast
+        jniLibs { useLegacyPackaging false }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    implementation "androidx.webkit:webkit:$androidxWebkitVersion"
+    implementation "androidx.activity:activity:$androidxActivityVersion"
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+// kotlin-stdlib 1.8+ already contains the jdk7/jdk8 extensions that older AndroidX pulls in separately
+configurations.configureEach {
+    exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk7"
+    exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8"
+}

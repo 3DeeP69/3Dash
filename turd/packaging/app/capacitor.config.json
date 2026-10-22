@@ -1,0 +1,13 @@
+{
+  "appId": "app.turd.hud",
+  "appName": "T.U.R.D.",
+  "webDir": "dist",
+  "loggingBehavior": "debug",
+  "server": { "androidScheme": "https", "cleartext": true },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#03060d",
+    "webContentsDebuggingEnabled": true,
+    "useLegacyBridge": false
+  }
+}

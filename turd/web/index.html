@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>T.U.R.D. HUD</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%2303060d' stroke='%232f8cff' stroke-width='5'/%3E%3Cpath d='M14 34 Q32 20 50 34' fill='none' stroke='%232f8cff' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#03060d">
+<meta name="description" content="Totally Unreliable & Really Dumb — a very smart 3D astronaut-helmet HUD dashboard." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   T.U.R.D. — astronaut-helmet curved HUD  (core shell)
+   Theme tokens are set at runtime from each section's theme{}.
+   The body[data-section] blocks below are only fallbacks.
+   ============================================================ */
+:root{
+  --bg:#03060d; --bg2:#081226;
+  --accent:#2f8cff; --accent2:#0050d0; --accent-rgb:47,140,255;
+  --ink:#dbe9ff; --ink-dim:#7d93b8; --ink-faint:#3e4f6e;
+  --glass:rgba(16,26,46,.42); --glass-line:rgba(var(--accent-rgb),.28);
+  --ok:#49f6b0; --warn:#ffcf5c; --bad:#ff5c7a;
+  --rail:112px; --curve:30px;
+  --font:"Rajdhani","Segoe UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  transition:--accent .9s;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:radial-gradient(135% 95% at 50% -8%,#0b1838 0%,#05091a 46%,#03060d 100%) fixed,#03060d;
+  color:var(--ink);font-family:var(--font);letter-spacing:.3px;
+  -webkit-font-smoothing:antialiased;transition:background .9s ease;overscroll-behavior:none}
+#scene{position:fixed;inset:0;z-index:0}
+
+/* curved HUD frame overlay */
+.theme-halo{position:fixed;inset:0;z-index:1;pointer-events:none;mix-blend-mode:screen;transition:background .9s ease;
+  background:radial-gradient(62% 52% at 50% 46%,rgba(var(--accent-rgb),.22),transparent 70%)}
+.visor-vignette{position:fixed;inset:0;z-index:2;pointer-events:none;
+  background:radial-gradient(130% 100% at 50% -18%, transparent 54%, rgba(0,0,0,.55) 78%, rgba(0,0,0,.92) 100%),
+             radial-gradient(120% 90% at 50% 120%, transparent 60%, rgba(0,0,0,.7) 100%);mix-blend-mode:multiply}
+.visor-sheen{position:fixed;inset:0;z-index:3;pointer-events:none;opacity:.5;
+  background:linear-gradient(115deg,rgba(255,255,255,.07) 0%,transparent 22%,transparent 72%,rgba(var(--accent-rgb),.05) 100%)}
+.scanlines{position:fixed;inset:0;z-index:4;pointer-events:none;opacity:.14;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.08) 0 1px,transparent 1px 3px);
+  mix-blend-mode:overlay;animation:drift 9s linear infinite}
+@keyframes drift{to{background-position:0 300px}}
+.arc{position:fixed;left:0;right:0;z-index:5;pointer-events:none;color:var(--accent)}
+.arc.top{top:0}.arc.bot{bottom:0;transform:scaleY(-1)}
+.arc svg{width:100%;height:132px;display:block;filter:drop-shadow(0 0 16px rgba(var(--accent-rgb),.75))}
+.arc svg path{stroke-width:3}
+/* helmet visor bezel — frames the whole screen as the glass opening */
+.helmet-bezel{position:fixed;inset:10px;z-index:6;pointer-events:none;border-radius:48px;
+  border:2px solid rgba(var(--accent-rgb),.32);transition:border-color .9s ease;
+  box-shadow:inset 0 0 0 2px rgba(0,0,0,.55),inset 0 0 80px rgba(0,0,0,.78),inset 0 0 160px rgba(var(--accent-rgb),.16)}
+.reticle{position:fixed;z-index:6;width:46px;height:46px;pointer-events:none;border:2px solid rgba(var(--accent-rgb),.5);opacity:.7}
+.reticle::after{content:"";position:absolute;width:8px;height:8px;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.reticle.tl{top:92px;left:16px;border-right:0;border-bottom:0}.reticle.tl::after{top:-5px;left:-5px}
+.reticle.tr{top:92px;right:16px;border-left:0;border-bottom:0}.reticle.tr::after{top:-5px;right:-5px}
+.reticle.bl{bottom:30px;left:16px;border-right:0;border-top:0}.reticle.bl::after{bottom:-5px;left:-5px}
+.reticle.br{bottom:30px;right:16px;border-left:0;border-top:0}.reticle.br::after{bottom:-5px;right:-5px}
+
+#status{position:fixed;top:0;left:0;right:0;z-index:7;height:64px;display:flex;align-items:center;gap:18px;
+  padding:0 30px 0 calc(var(--rail) + 22px);pointer-events:none;font-family:var(--mono);font-size:12px;color:var(--ink-dim);
+  text-transform:uppercase;letter-spacing:2px}
+#status .brand{color:var(--accent);font-weight:700;font-size:16px;letter-spacing:5px;text-shadow:0 0 16px rgba(var(--accent-rgb),.7);pointer-events:auto;cursor:pointer;user-select:none;line-height:1.1}
+#status .brand small{display:block;color:var(--ink-faint);font-weight:400;font-size:9px;letter-spacing:2px;margin-top:3px}
+#status .spacer{flex:1}
+#status .rstat{display:flex;align-items:center;gap:13px;font-size:11px;letter-spacing:1.5px}
+#status .rstat .sep{color:var(--ink-faint);opacity:.6}
+#status .rstat #st-clock{color:var(--ink);font-size:13px;letter-spacing:2px}
+#status .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block;margin-right:7px;box-shadow:0 0 8px var(--ok);vertical-align:middle;animation:pulse 2.4s infinite}
+@keyframes pulse{50%{opacity:.3}}
+
+#rail{position:fixed;left:0;top:0;bottom:0;z-index:8;width:var(--rail);display:flex;flex-direction:column;align-items:stretch;justify-content:center;pointer-events:auto}
+#rail .nav{display:flex;flex-direction:column;gap:10px;padding:22px 12px;
+  background:linear-gradient(180deg,rgba(10,20,44,.62),rgba(4,8,20,.55));backdrop-filter:blur(16px) saturate(1.1);
+  border:1px solid var(--glass-line);border-left:0;border-radius:0 28px 28px 0;box-shadow:14px 0 60px rgba(0,0,0,.55)}
+.navbtn{position:relative;width:100%;min-height:70px;border-radius:18px;border:1px solid transparent;background:transparent;
+  color:var(--ink-dim);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;transition:.22s}
+.navbtn .ico{font-size:25px;line-height:1}
+.navbtn .lbl{font-family:var(--mono);font-size:9px;letter-spacing:1.4px;text-transform:uppercase}
+.navbtn .ico{transition:transform .22s,text-shadow .22s,color .22s}
+.navbtn:hover{color:var(--ink)}
+.navbtn:hover .ico{text-shadow:0 0 14px rgba(var(--accent-rgb),.7)}
+.navbtn:focus-visible{outline:none;color:var(--ink);background:radial-gradient(60% 60% at 50% 50%,rgba(var(--accent-rgb),.18),transparent)}
+/* active: glow bar + lit icon, no filled pill */
+.navbtn.active{color:#fff;background:radial-gradient(75% 60% at 0% 50%,rgba(var(--accent-rgb),.3),transparent 75%)}
+.navbtn.active .ico{color:var(--accent);text-shadow:0 0 18px rgba(var(--accent-rgb),.95);transform:scale(1.12)}
+.navbtn.active::before{content:"";position:absolute;left:-12px;top:16px;bottom:16px;width:4px;border-radius:4px;background:var(--accent);box-shadow:0 0 14px var(--accent)}
+
+#stage{position:fixed;inset:0;z-index:7;pointer-events:none;padding:84px calc(var(--rail) + 28px) 56px calc(var(--rail) + 28px)}
+.section{position:absolute;inset:0;padding:inherit;display:grid;place-items:center;opacity:0;transform:scale(1.04) translateY(10px);
+  pointer-events:none;transition:opacity .5s ease, transform .5s ease}
+.section.show{opacity:1;transform:none;pointer-events:auto}
+.panel{position:relative;width:min(1100px,100%);max-height:100%;overflow:auto;pointer-events:auto;
+  background:linear-gradient(158deg,rgba(24,40,72,.55),rgba(8,14,30,.42));
+  border:2px solid rgba(var(--accent-rgb),.55);border-radius:calc(var(--curve) + 8px);backdrop-filter:blur(22px) saturate(1.5);
+  box-shadow:0 40px 110px rgba(0,0,0,.62),0 0 0 1px rgba(var(--accent-rgb),.4),0 0 34px rgba(var(--accent-rgb),.22),inset 0 1px 0 rgba(255,255,255,.16),inset 0 0 70px rgba(var(--accent-rgb),.06);
+  padding:28px 32px}
+.section:not(.show) .panel{pointer-events:none;visibility:hidden}
+.panel::-webkit-scrollbar{width:9px}.panel::-webkit-scrollbar-thumb{background:rgba(var(--accent-rgb),.4);border-radius:9px}
+.phead{display:flex;align-items:baseline;gap:14px;margin-bottom:18px;border-bottom:1px solid var(--glass-line);padding-bottom:12px}
+.phead h1{font-size:26px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--ink);text-shadow:0 0 18px rgba(var(--accent-rgb),.5)}
+.phead .k{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:2px;border:1px solid var(--glass-line);padding:3px 8px;border-radius:6px}
+.phead .sub{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-dim);letter-spacing:1px}
+
+/* shared building blocks for section modules */
+.grid{display:grid;gap:16px}.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:900px){.g2,.g3{grid-template-columns:1fr}}
+.card{background:rgba(var(--accent-rgb),.05);border:1px solid var(--glass-line);border-radius:18px;padding:16px 18px;transition:.25s;position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(var(--accent-rgb),.14),transparent 60%);opacity:0;transition:.25s}
+.card:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 14px 40px rgba(0,0,0,.45)}
+.card:hover::before{opacity:1}
+.card h3{font-size:16px;letter-spacing:1px;margin-bottom:6px;color:var(--ink)}
+.card p{font-size:13px;line-height:1.5;color:var(--ink-dim)}
+.card .tags{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);border:1px solid var(--glass-line);padding:2px 7px;border-radius:5px}
+.card a.go{display:inline-block;margin-top:12px;font-family:var(--mono);font-size:11px;letter-spacing:1px;color:#04121a;background:var(--accent);padding:6px 12px;border-radius:8px;text-decoration:none;text-transform:uppercase;box-shadow:0 0 14px rgba(var(--accent-rgb),.5)}
+.btn{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;color:var(--ink);background:rgba(var(--accent-rgb),.12);border:1px solid var(--glass-line);padding:9px 16px;border-radius:10px;transition:.2s}
+.btn:hover{background:var(--accent);color:#04121a;box-shadow:0 0 16px rgba(var(--accent-rgb),.6)}
+.btn.sm{padding:6px 10px;font-size:11px}
+input,textarea,select{font-family:var(--mono);font-size:13px;color:var(--ink);background:rgba(0,0,0,.3);border:1px solid var(--glass-line);border-radius:10px;padding:10px 12px;width:100%;outline:none;transition:.2s}
+input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.18)}
+label{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-dim);display:block;margin-bottom:6px}
+.row{display:flex;gap:10px;align-items:center}.muted{color:var(--ink-dim)}.mono{font-family:var(--mono)}
+.big{font-size:52px;font-weight:700;line-height:1;text-shadow:0 0 24px rgba(var(--accent-rgb),.5)}
+.meter{height:10px;border-radius:10px;background:rgba(0,0,0,.4);overflow:hidden;border:1px solid var(--glass-line)}
+.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .6s}
+
+/* login */
+#login{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:radial-gradient(130% 100% at 50% -20%,rgba(16,30,66,.32),rgba(2,4,9,.86) 72%);transition:opacity .7s;overflow:hidden}
+#login.hide{opacity:0;pointer-events:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* --- cosmos: abstract deep-space backdrop behind the floating fields --- */
+.login-cosmos{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.login-cosmos .neb{position:absolute;border-radius:50%;filter:blur(64px);opacity:.5;mix-blend-mode:screen}
+.login-cosmos .n1{width:62vmax;height:62vmax;left:-16vmax;top:-22vmax;background:radial-gradient(circle,rgba(var(--accent-rgb),.55),transparent 60%);animation:drift1 26s ease-in-out infinite}
+.login-cosmos .n2{width:52vmax;height:52vmax;right:-18vmax;bottom:-18vmax;background:radial-gradient(circle,rgba(92,54,214,.5),transparent 60%);animation:drift2 33s ease-in-out infinite}
+.login-cosmos .n3{width:40vmax;height:40vmax;left:42%;top:28%;background:radial-gradient(circle,rgba(0,196,255,.32),transparent 60%);animation:drift3 21s ease-in-out infinite}
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(8vmax,6vmax) scale(1.12)}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-7vmax,-5vmax) scale(1.16)}}
+@keyframes drift3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-5vmax,7vmax) scale(.9)}}
+.login-cosmos .orbit{position:absolute;left:50%;top:50%;width:72vmin;height:72vmin;margin:-36vmin 0 0 -36vmin;border:1px solid rgba(var(--accent-rgb),.13);border-radius:50%;animation:spin 64s linear infinite}
+.login-cosmos .orbit.o2{width:48vmin;height:48vmin;margin:-24vmin 0 0 -24vmin;border-color:rgba(255,255,255,.06);animation-duration:44s;animation-direction:reverse}
+.login-cosmos .orbit::after{content:"";position:absolute;top:-3px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:var(--accent);box-shadow:0 0 14px var(--accent)}
+/* drop the heaviest blur on weaker hardware (helps low-end PC) — gradients still read as nebula */
+body:not([data-quality="HIGH"]) .login-cosmos .neb{filter:blur(22px);opacity:.38}
+body:not([data-quality="HIGH"]) .login-cosmos .orbit{animation:none}
+/* --- de-boxed, floating login column --- */
+.login-card{width:min(440px,90vw);text-align:center;padding:22px 26px;position:relative;background:none;border:0;box-shadow:none}
+.login-card::before{content:"";position:absolute;left:50%;top:30px;width:300px;height:300px;transform:translateX(-50%);background:radial-gradient(circle,rgba(var(--accent-rgb),.17),transparent 62%);z-index:-1;pointer-events:none}
+.login-card>*{position:relative}
+.login-logo{font-size:52px;font-weight:700;letter-spacing:14px;color:var(--accent);margin-bottom:6px;animation:logoGlow 3.6s ease-in-out infinite}
+@keyframes logoGlow{0%,100%{text-shadow:0 0 26px rgba(var(--accent-rgb),.6)}50%{text-shadow:0 0 50px rgba(var(--accent-rgb),1),0 0 110px rgba(var(--accent-rgb),.5)}}
+.login-sub{font-family:var(--mono);font-size:10px;letter-spacing:4px;color:var(--ink-dim);text-transform:uppercase;margin-bottom:34px;opacity:.85}
+.login-card .f{text-align:left;margin-bottom:20px;position:relative}
+.login-card .f label{font-size:10px;letter-spacing:3px;color:var(--ink-dim);margin-bottom:9px;opacity:.75}
+.login-card .f input{background:transparent;border:0;border-bottom:1px solid rgba(var(--accent-rgb),.3);border-radius:0;padding:8px 2px;font-size:15px;letter-spacing:2px;transition:border-color .25s,box-shadow .25s}
+.login-card .f input:focus{border-bottom-color:var(--accent);box-shadow:0 2px 0 -1px var(--accent)}
+.login-card .btn{background:rgba(var(--accent-rgb),.09);border:1px solid rgba(var(--accent-rgb),.5);border-radius:40px;padding:13px;letter-spacing:3px;margin-top:4px;transition:.25s}
+.login-card .btn:hover{background:var(--accent);color:#04121a;box-shadow:0 0 28px rgba(var(--accent-rgb),.75)}
+.login-msg{min-height:18px;font-family:var(--mono);font-size:11px;letter-spacing:1px;margin:4px 0 16px}
+.login-msg.err{color:var(--bad)}.login-msg.ok{color:var(--ok)}
+.boot{font-family:var(--mono);font-size:10px;color:var(--ink-faint);letter-spacing:1px;margin-top:22px;text-align:center;white-space:pre-wrap;opacity:.6}
+
+#modal{position:fixed;inset:0;z-index:30;display:none;place-items:center;background:rgba(2,4,9,.8);backdrop-filter:blur(6px)}
+#modal.show{display:grid}
+.modal-card{width:min(760px,92vw);max-height:84vh;overflow:auto;background:var(--glass);border:1px solid var(--glass-line);border-radius:22px;padding:24px 26px;box-shadow:0 30px 90px rgba(0,0,0,.6)}
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid rgba(var(--accent-rgb),.12)}
+th{color:var(--accent);letter-spacing:1px;text-transform:uppercase;font-size:10px}
+td.ok{color:var(--ok)}td.bad{color:var(--bad)}
+.toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);z-index:40;background:var(--glass);border:1px solid var(--glass-line);border-radius:12px;padding:12px 20px;font-family:var(--mono);font-size:12px;letter-spacing:1px;color:var(--ink);opacity:0;pointer-events:none;transition:.3s;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.toast.show{opacity:1;transform:translateX(-50%)}
+#perf{position:fixed;bottom:26px;right:30px;z-index:9;pointer-events:auto;font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--ink-dim);padding:6px 4px;cursor:pointer;transition:color .2s,text-shadow .2s}
+#perf:hover{color:var(--ink);text-shadow:0 0 12px rgba(var(--accent-rgb),.8)}
+#perf-val{color:var(--accent)}
+/* phone: the rail becomes a bottom dock so content gets the full width */
+@media(max-width:760px){
+  :root{--rail:0px;--curve:22px;--dock:72px;--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px)}
+  #status{height:calc(56px + var(--sat));padding:var(--sat) 20px 0 22px;gap:10px}
+  #status .brand{font-size:14px;letter-spacing:4px}
+  #status .brand small,#st-sys,#st-sys+.sep{display:none}
+  #status .rstat{gap:9px}
+  #st-loc{max-width:38vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #rail{top:auto;bottom:0;right:0;width:auto;padding:0 10px calc(8px + var(--sab))}
+  #rail .nav{flex-direction:row;gap:2px;padding:6px;border:1px solid var(--glass-line);border-radius:24px;box-shadow:0 -10px 50px rgba(0,0,0,.6);overflow-x:auto;scrollbar-width:none}
+  #rail .nav::-webkit-scrollbar{display:none}
+  .navbtn{flex:1 0 46px;min-width:46px;min-height:56px;gap:4px;border-radius:16px}
+  .navbtn .ico{font-size:21px}
+  .navbtn .lbl{font-size:8px;letter-spacing:.6px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .navbtn.active{background:radial-gradient(70% 70% at 50% 0%,rgba(var(--accent-rgb),.32),transparent 80%)}
+  .navbtn.active::before{left:28%;right:28%;top:-6px;bottom:auto;width:auto;height:3px}
+  #stage{padding:calc(62px + var(--sat)) 10px calc(var(--dock) + 16px + var(--sab)) 10px}
+  #perf{top:calc(42px + var(--sat));bottom:auto;right:20px;font-size:9px;padding:2px 4px}
+  .toast{bottom:calc(var(--dock) + 26px + var(--sab));max-width:88vw}
+  .phead{flex-wrap:wrap;row-gap:6px}.phead h1{font-size:20px}.phead .sub{margin-left:0;flex-basis:100%}
+  .arc svg{height:80px}.panel{transform:none}.helmet-bezel{inset:6px;border-radius:30px}
+  .reticle.bl,.reticle.br{display:none}.reticle.tl,.reticle.tr{top:58px;width:30px;height:30px}
+}
+/* perf: blend modes + an animated full-screen layer over the live WebGL canvas force a
+   full recomposite every frame (~2.3x frame cost on a Fold4-class phone). Normal blending
+   of the black vignette is mathematically identical to multiply, so it looks the same. */
+.theme-halo,.visor-vignette,.scanlines{mix-blend-mode:normal}
+.theme-halo{opacity:.75}
+.scanlines{animation:none;opacity:.07}
+/* below HIGH: drop live blur behind glass (another ~1.4x); denser tint keeps text readable */
+body:not([data-quality="HIGH"]) :is(.panel,#rail .nav,.login-card,.modal-card,.toast){backdrop-filter:none;-webkit-backdrop-filter:none}
+body:not([data-quality="HIGH"]) .panel{background-color:rgba(5,10,22,.66)!important}
+body:not([data-quality="HIGH"]) #rail .nav{background:rgba(5,10,22,.86)}
+/* Fold4 inner screen landscape (841x673) + short laptop windows: the 9-item rail is taller
+   than the viewport, so compact it by height and let it scroll as a last resort */
+#rail .nav{max-height:calc(100vh - 16px);overflow-y:auto;scrollbar-width:none}
+#rail .nav::-webkit-scrollbar{display:none}
+@media(min-width:761px) and (max-height:820px){#rail .nav{gap:4px;padding:12px 10px}.navbtn{min-height:56px;gap:3px}.navbtn .ico{font-size:21px}}
+@media(min-width:761px) and (max-height:640px){.navbtn{min-height:46px}.navbtn .lbl{display:none}}
+/* medium widths: give the panel the room instead of a mirrored rail gutter */
+@media(min-width:761px) and (max-width:1100px){#stage{padding-right:24px}}
+/* Fold4 cover screen (344px): nine dock icons fit only without labels; active one keeps its label */
+@media(max-width:420px){
+  .navbtn{flex:1 1 0;min-width:0;padding:0}
+  .navbtn .lbl{display:none}
+  .navbtn.active .lbl{display:block;font-size:7px;letter-spacing:.3px}
+  #rail .nav{gap:0;padding:6px 4px}
+}
+/* ---- frame cleanup: every HUD line has its own lane, nothing crosses text or another edge ----
+   arcs stay above the status text, the rail floats inside the visor bezel, the quality
+   readout clears the corner reticle, and the bezel sits outside every panel. */
+.arc svg{height:46px;filter:drop-shadow(0 0 10px rgba(var(--accent-rgb),.6))}
+.arc.bot svg{height:34px}
+.helmet-bezel{inset:6px;border-radius:44px;border-color:rgba(var(--accent-rgb),.22)}
+.reticle{width:34px;height:34px;opacity:.55}
+.reticle.tl,.reticle.tr{top:74px}.reticle.bl,.reticle.br{bottom:18px}
+.reticle.tl,.reticle.bl{left:calc(var(--rail) + 30px)}
+@media(min-width:761px){
+  #perf{right:64px;bottom:14px}
+  :root{--rail-x:16px}
+  #rail{left:var(--rail-x)}
+  #rail .nav{border-left:1px solid var(--glass-line);border-radius:26px}
+  .navbtn.active::before{left:-11px}
+  #stage{padding-left:calc(var(--rail) + var(--rail-x) + 24px)}
+  #status{padding-left:calc(var(--rail) + var(--rail-x) + 26px)}
+  /* reticles sit 10px off every panel corner (stage padding: rail+40 left, rail+28 right, 56 bottom) */
+  .reticle.tr,.reticle.br{right:calc(var(--rail) + 18px)}
+  .reticle.bl,.reticle.br{bottom:46px}
+  .panel .radar-wrap{align-items:stretch}
+}
+@media(min-width:761px) and (max-width:1100px){.reticle.tr,.reticle.br{right:14px}.panel .radar-wrap{align-items:start}}
+/* inner scrollers end in a soft fade, never a hard line through a card's border */
+.xx-body{-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - 40px),transparent)}
+@media(max-width:760px){
+  .arc svg{height:30px}.arc.bot{display:none}
+  .reticle{display:none}
+  .helmet-bezel{inset:4px;border-radius:28px}
+}
+/* the status bar sat under #stage (same z-index, earlier in the DOM), so the shown section's
+   full-screen box swallowed taps on the wordmark; lift it (it stays pointer-events:none except its controls) */
+#status{z-index:9}
+/* status-bar session tools (Access log for admins, Lock for everyone): text-style, no pills */
+#st-tools{display:inline-flex;gap:4px;margin-right:6px;pointer-events:auto}
+.st-btn{background:none;border:0;color:var(--ink-dim);font:inherit;letter-spacing:inherit;text-transform:uppercase;cursor:pointer;padding:8px 6px;transition:color .2s,text-shadow .2s}
+.st-btn:hover,.st-btn:focus-visible{outline:none;color:var(--ink);text-shadow:0 0 12px rgba(var(--accent-rgb),.8)}
+#stAudit{color:#ff8a9c}#stAudit:hover{color:#fff;text-shadow:0 0 12px rgba(255,92,122,.8)}
+@media(max-width:760px){ #st-tools{position:fixed;top:calc(36px + var(--sat,0px));left:16px;margin:0;font-size:9px} .st-btn{padding:6px 6px 6px 0} }
+</style>
+<!-- section modules may add their own styles here (owned by the at-a-glance thread) -->
+<link rel="stylesheet" href="./src/sections/sections.css" onerror="this.remove()">
+</head>
+<body class="noscroll">
+
+<canvas id="scene"></canvas>
+<div class="theme-halo"></div>
+<div class="visor-vignette"></div>
+<div class="visor-sheen"></div>
+<div class="scanlines"></div>
+<div class="arc top"><svg viewBox="0 0 1000 120" preserveAspectRatio="none"><path d="M0,10 Q500,118 1000,10" fill="none" stroke="currentColor" stroke-width="2" opacity=".55"/><path d="M0,0 Q500,96 1000,0" fill="none" stroke="currentColor" stroke-width="1" opacity=".3"/></svg></div>
+<div class="arc bot"><svg viewBox="0 0 1000 120" preserveAspectRatio="none"><path d="M0,10 Q500,118 1000,10" fill="none" stroke="currentColor" stroke-width="2" opacity=".4"/></svg></div>
+<div class="reticle tl"></div><div class="reticle tr"></div><div class="reticle bl"></div><div class="reticle br"></div>
+<div class="helmet-bezel"></div>
+
+<div id="status">
+  <span class="brand" id="brand">T.U.R.D. <small>// totally unreliable &amp; really dumb</small></span>
+  <span class="spacer"></span>
+  <span class="rstat"><span class="dot"></span><span id="st-sys">systems nominal</span>
+    <span class="sep">·</span><span id="st-loc">standby</span>
+    <span class="sep">·</span><span id="st-clock">--:--:--</span></span>
+</div>
+
+<div id="rail"><nav class="nav" id="nav"></nav></div>
+<div id="stage"></div>
+<div id="perf">QUALITY: <span id="perf-val">HIGH</span></div>
+
+<div id="login">
+  <div class="login-cosmos" aria-hidden="true">
+    <span class="neb n1"></span><span class="neb n2"></span><span class="neb n3"></span>
+    <span class="orbit"></span><span class="orbit o2"></span>
+  </div>
+  <div class="login-card">
+    <div class="login-logo">T.U.R.D.</div>
+    <div class="login-sub">deep-space uplink · restricted deck</div>
+    <form id="loginForm" autocomplete="off">
+      <div class="f"><label>operator id</label><input id="u" placeholder="admin" autocomplete="off"></div>
+      <div class="f"><label>passkey</label><input id="p" type="password" placeholder="••••••" autocomplete="off"></div>
+      <div class="login-msg" id="lmsg"></div>
+      <button class="btn" style="width:100%" type="submit">INITIATE UPLINK</button>
+    </form>
+    <div class="boot" id="boot"></div>
+  </div>
+</div>
+
+<div id="modal"><div class="modal-card" id="modalBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="./src/version.js"></script>
+<script type="module" src="./src/core.js"></script>
+</body>
+</html>

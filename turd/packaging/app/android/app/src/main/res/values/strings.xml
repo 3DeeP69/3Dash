@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">T.U.R.D.</string>
+    <string name="title_activity_main">T.U.R.D.</string>
+    <string name="package_name">app.turd.hud</string>
+    <string name="custom_url_scheme">app.turd.hud</string>
+</resources>
