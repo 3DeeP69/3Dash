@@ -7,13 +7,49 @@ To check which build you have: the version is shown under the login form and nex
 
 ---
 
-## Next (not built yet)
+## Next (not built yet, planned as v1.6.0)
 
-Nothing waiting yet.
+In the shared code and waiting for the next build:
+- **New Space tab** with NASA's picture of the day, a live ISS tracker with passes over you, tonight's sky (moon, planets, meteor showers), space weather and aurora odds, asteroid flybys, Mars rover photos and launch countdowns. It works offline from cache, and POTATO mode skips the images.
+- **New POTATO quality** for very weak PCs and old phones. It's flat 2D, with no 3D background, blur, glow or animation. Everything still works, and the section colors still change. In testing, the app went from fully busy to about 4% busy and held a steady 60 fps where MED struggled.
+- **Choosing it:** pick it from QUALITY at the bottom right (HIGH > MED > LOW > POTATO). A machine that's too slow switches to it by itself within about half a minute and remembers that on that device. Choosing a quality yourself always wins.
+- **Fixed:** the ambient clock screen could make the app think the PC was struggling and lower the quality.
+- **Cleaner look:**
+  - The sidebar labels on the PC are easier to read.
+  - Pop-up messages no longer squeeze into a tall narrow box.
+  - On the Fold, the Logbook types and filters sit on one row.
+  - Project names stay on one line.
+  - The next event's title fits on the Fold cover screen.
 
 ---
 
-## v1.4.0 (2026-10-22) · CURRENT
+## v1.5.0 (2026-11-05) · CURRENT
+
+**T.U.R.D. now runs on Linux.** Windows, Linux and Android are all at v1.5.0.
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `TURD-1.5.0-windows-setup.exe` | 112 MB | `6665440a4db1…03c196` |
+| `TURD-1.5.0-android.apk` | 47 MB | `a43970b83662…9f9780` |
+| `TURD-1.5.0-linux.AppImage` | 197 MB | `54e902229968…3d2372` |
+| `TURD-1.5.0-linux.deb` | 127 MB | `41e7bb8d1519…65cedf` |
+
+**New**
+- **Linux downloads:**
+  - The **AppImage** runs on any distro: make it runnable, then double-click it.
+  - The **.deb** is for Debian, Ubuntu and Mint: `sudo apt install ./TURD-1.5.0-linux.deb`.
+  - Both have the chat and assistant server built in, just like Windows, so there's nothing else to install. The first login is admin / admin.
+- The Windows-only extras (firewall prompt, Bluetooth batteries, network scan, Wake PC, port scan) are switched off on Linux, so the app runs cleanly there.
+
+Nothing else in the app changed. Windows and Android were rebuilt so every platform shows the same number. Install over v1.4.0 and your data stays. The APK uses the same key (checked: code 10500, cert 6fc5df18…).
+
+**Known**
+- In the Linux and Android files delivered to the PC, the in-app "What's new" still lists the v1.4.0 items. The GitHub-built copies will show the Linux notes.
+- Windows still says "Windows protected your PC" because the installer isn't code-signed. Click More info, then Run anyway.
+
+---
+
+## v1.4.0 (2026-10-22) · SUPERSEDED by v1.5.0
 
 Windows installer and Fold4 APK, both v1.4.0. This is the deep polish pass, focused on controller, keyboard, offline behavior, layout and speed.
 
@@ -39,7 +75,7 @@ Install over v1.3.0. Your accounts, logbook and chat stay. The APK is signed wit
 
 ---
 
-## v1.3.0 (2026-10-22) · SUPERSEDED by v1.4.0
+## v1.3.0 (2026-10-22) · SUPERSEDED by v1.5.0
 
 Windows installer and Fold4 APK, both v1.3.0. This is the "damn near perfection" pass.
 
@@ -74,7 +110,7 @@ Install over v1.2.0. Your accounts, logbook and chat stay. The APK is signed wit
 
 ---
 
-## v1.2.0 (2026-10-22) · SUPERSEDED by v1.4.0
+## v1.2.0 (2026-10-22) · SUPERSEDED by v1.5.0
 
 Windows installer and Fold4 APK, both v1.2.0. There is no desktop zip anymore: the installer is the app.
 
@@ -109,7 +145,7 @@ Install over v1.1.0. Your accounts, logbook and chat stay. The APK is signed wit
 
 ---
 
-## v1.1.0 (2026-10-21) · SUPERSEDED by v1.4.0
+## v1.1.0 (2026-10-21) · SUPERSEDED by v1.5.0
 
 Windows installer, Fold4 APK and desktop zip, all v1.1.0.
 
@@ -148,7 +184,7 @@ Install over the old version. Your accounts, logbook and chat stay. The APK is s
 
 ---
 
-## v1.0.1 (2026-10-21) · desktop folder build · SUPERSEDED by v1.4.0
+## v1.0.1 (2026-10-21) · desktop folder build · SUPERSEDED by v1.5.0
 
 Only the desktop zip changed. The Windows installer and Fold4 APK are still v1.0.0 until v1.1.0.
 
@@ -171,7 +207,7 @@ How to use: unzip, then double-click `start-windows.bat` (needs Node.js). Your o
 
 ---
 
-## v1.0.0 (2026-10-21) · SUPERSEDED by v1.4.0
+## v1.0.0 (2026-10-21) · SUPERSEDED by v1.5.0
 
 First native builds.
 

@@ -584,6 +584,49 @@ public class TurdNativePlugin extends Plugin {
         return bm == null ? null : bm.getAdapter();
     }
 
+    // Cross-platform Wi-Fi adapter / capability reporting for the Spy Tools UI. Android apps can
+    // enumerate only the one managed Wi-Fi radio and cannot do monitor mode or injection, so those
+    // are reported false; bands come from the supported-band flags. MAC is not exposed to apps.
+    @PluginMethod
+    @SuppressLint("MissingPermission")
+    public void radarAdapters(PluginCall call) {
+        JSArray arr = new JSArray();
+        WifiManager wm = (WifiManager) getContext().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        if (wm != null) {
+            JSObject o = new JSObject();
+            o.put("id", "wlan0");
+            o.put("name", "Wi-Fi");
+            o.put("driver", JSObject.NULL);
+            o.put("chipset", JSObject.NULL);
+            JSArray bands = new JSArray();
+            bands.put("2.4");
+            try { if (wm.is5GHzBandSupported()) bands.put("5"); } catch (Exception ignored) {}
+            try { if (Build.VERSION.SDK_INT >= 30 && wm.is6GHzBandSupported()) bands.put("6"); } catch (Exception ignored) {}
+            o.put("bands", bands);
+            o.put("monitor", false);
+            o.put("injection", false);
+            o.put("up", wm.isWifiEnabled());
+            o.put("mac", JSObject.NULL);
+            arr.put(o);
+        }
+        JSObject res = new JSObject();
+        res.put("items", arr);
+        call.resolve(res);
+    }
+
+    @PluginMethod
+    public void radarCapabilities(PluginCall call) {
+        WifiManager wm = (WifiManager) getContext().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        JSObject res = new JSObject();
+        res.put("platform", "android");
+        res.put("wifiScan", wm != null);
+        res.put("monitor", false);
+        res.put("injection", false);
+        res.put("ble", adapter() != null);
+        res.put("adapters", wm != null ? 1 : 0);
+        call.resolve(res);
+    }
+
     @PluginMethod
     public void bleScan(final PluginCall call) {
         if (!"granted".equals(stateOf(bleAliases()))) { requestPermissionForAliases(bleAliases(), call, "blePermsDone"); return; }

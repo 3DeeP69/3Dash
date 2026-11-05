@@ -6,6 +6,7 @@
 // free, keyless OpenStreetMap/CARTO rasters. Returns a cleanup function. Performance: canvas
 // renderer, capped marker counts, a single ~15 s aircraft refresh while the map is visible.
 import * as SRC from "./sources.js";
+import { lowFx } from "../util.js";
 
 const LEAFLET_LOCAL_CSS = new URL("../../../vendor/leaflet/leaflet.css", import.meta.url).href;
 const LEAFLET_LOCAL_JS = new URL("../../../vendor/leaflet/leaflet.js", import.meta.url).href;
@@ -59,13 +60,18 @@ export function mountMap(el, ctx) {
   const { esc, toast, head } = ctx;
   const http = ctx.http;
   const saved = Object.assign({}, DEF, ctx.LS.get(KEY, {}));
-  const flags = Object.assign({ air: true, police: true, alpr: true, cam: true, me: true, milOnly: false, region: "memphis" }, saved.layers || {});
+  const flags = Object.assign({ air: true, iss: false, police: true, alpr: true, cam: true, me: true, milOnly: false, region: "memphis" }, saved.layers || {});
   const openExt = url => { const N = window.TURD_NATIVE; if (N && N.openExternal) N.openExternal(url); else window.open(url, "_blank", "noopener"); };
+  // potato / low-power mode: fewer markers, slower aircraft refresh (honors the app's global quality + reduced-motion)
+  const LO = lowFx();
+  const CAP = { air: LO ? 120 : 350, inc: LO ? 200 : 800, cam: LO ? 300 : 1200 };
+  const AIR_MS = LO ? 30000 : 15000;
 
   el.innerHTML = head("Live Map", "MAP", "aircraft · police · cameras") + `
     <div class="ops-map-wrap">
       <div class="ops-map-bar">
         ${toggle("air", "✈", "Aircraft", flags.air)}
+        ${toggle("iss", "🛰", "ISS", flags.iss)}
         ${toggle("police", "⚑", "Police", flags.police)}
         ${toggle("alpr", "⦿", "ALPR cams", flags.alpr)}
         ${toggle("cam", "◻", "Other cams", flags.cam)}
@@ -84,7 +90,8 @@ export function mountMap(el, ctx) {
       <div id="opsScanPanel" class="ops-scan-panel" hidden></div>
       <div id="opsMap" class="ops-map"></div>
       <div class="ops-map-foot"><span id="opsMapStat" class="mono">loading map…</span>
-        <span class="ops-map-legend"><i class="lg air"></i>aircraft <i class="lg gov"></i>gov/police <i class="lg alpr"></i>ALPR <i class="lg cam"></i>CCTV <i class="lg inc"></i>incident</span></div>
+        <span id="opsSpaceWx" class="ops-spacewx mono" title="NOAA planetary Kp index — geomagnetic activity / aurora chance"></span>
+        <span class="ops-map-legend"><i class="lg air"></i>aircraft <i class="lg gov"></i>gov/police <i class="lg iss"></i>ISS <i class="lg alpr"></i>ALPR <i class="lg cam"></i>CCTV <i class="lg inc"></i>incident</span></div>
     </div>`;
 
   function toggle(k, ic, lbl, on, cls) {
@@ -155,7 +162,7 @@ export function mountMap(el, ctx) {
     const canvas = L.canvas({ padding: 0.5 });
     layers = {
       air: L.layerGroup().addTo(flags.air ? map : L.layerGroup()),
-      police: L.layerGroup(), alpr: L.layerGroup(), cam: L.layerGroup(), me: L.layerGroup(),
+      iss: L.layerGroup(), police: L.layerGroup(), alpr: L.layerGroup(), cam: L.layerGroup(), me: L.layerGroup(),
     };
     layers._canvas = canvas;
     Object.keys(layers).forEach(k => { if (flags[k]) layers[k].addTo(map); });
@@ -164,7 +171,9 @@ export function mountMap(el, ctx) {
     setStat("ready");
     if (flags.me) locate(true);
     refresh();
-    timer = setInterval(() => { if (!document.hidden && flags.air) refresh("air"); }, 15000);
+    spaceWx();
+    if (flags.iss) doISS();
+    timer = setInterval(() => { if (document.hidden) return; if (flags.air) refresh("air"); if (flags.iss) doISS(); }, AIR_MS);
   }).catch(e => setStat(String(e.message || e)));
 
   /* ---- wire toggles ---- */
@@ -173,6 +182,7 @@ export function mountMap(el, ctx) {
     b.classList.toggle("on", flags[k]); b.setAttribute("aria-pressed", !!flags[k]);
     if (map && layers[k]) { flags[k] ? layers[k].addTo(map) : map.removeLayer(layers[k]); }
     if (k === "milOnly") refresh("air");
+    if (k === "iss" && flags.iss) doISS();
     if (k === "police" && flags.police) refresh("police");
     if ((k === "alpr" || k === "cam") && (flags.alpr || flags.cam)) refresh("cams");
     if (k === "me" && flags.me) locate(true);
@@ -229,7 +239,7 @@ export function mountMap(el, ctx) {
     const ac = await SRC.aircraft(http, c.lat, c.lng, nm);
     if (dead || !map) return;
     const show = flags.milOnly ? ac.filter(a => a.gov) : ac;
-    const capped = show.slice(0, 350);
+    const capped = show.slice(0, CAP.air);
     layers.air.clearLayers();
     // drop last cycle's mirrored gov-aircraft markers from the police layer (keep incident dots)
     layers.police.eachLayer(l => { if (l._gov) layers.police.removeLayer(l); });
@@ -263,7 +273,7 @@ export function mountMap(el, ctx) {
     if (dead || !map) return;
     // remove only incident markers (they carry _inc), keep ⚑ aircraft markers
     layers.police.eachLayer(l => { if (l._inc) layers.police.removeLayer(l); });
-    inc.slice(0, 800).forEach(p => {
+    inc.slice(0, CAP.inc).forEach(p => {
       const m = L.circleMarker([p.lat, p.lon], { renderer: layers._canvas, radius: 5, color: "#ff7a3f", weight: 1, fillColor: "#ff7a3f", fillOpacity: .7 });
       m._inc = true;
       m.bindPopup(`<b>${esc(p.cat)}</b><br>${esc(p.street || "")}${p.outcome ? "<br>" + esc(p.outcome) : ""}${p.month ? "<br>" + esc(p.month) : ""}`);
@@ -278,7 +288,7 @@ export function mountMap(el, ctx) {
     if (dead || !map) return;
     layers.alpr.clearLayers(); layers.cam.clearLayers();
     let nA = 0, nC = 0;
-    cams.forEach(cm => {
+    cams.slice(0, CAP.cam).forEach(cm => {
       const alpr = cm.kind === "alpr";
       const grp = alpr ? layers.alpr : layers.cam;
       const col = alpr ? "#ff3fb0" : "#9a6bff";
@@ -287,6 +297,30 @@ export function mountMap(el, ctx) {
       m.addTo(grp); alpr ? nA++ : nC++;
     });
     setStat(`${nA} ALPR · ${nC} other cameras in view`);
+  }
+
+  // ---- NASA touch: live ISS position + ground track ----
+  async function doISS() {
+    const s = await SRC.iss(http);
+    if (dead || !map || !flags.iss) return;
+    layers.iss.clearLayers();
+    if (!s) return;
+    const ic = L.divIcon({ className: "ops-iss", html: "🛰", iconSize: [24, 24] });
+    L.marker([s.lat, s.lon], { icon: ic, zIndexOffset: 1000 })
+      .bindPopup(`<b>ISS · Zarya</b><br>${s.alt != null ? esc(Math.round(s.alt) + " km up") : ""}${s.vel != null ? " · " + esc(Math.round(s.vel) + " km/h") : ""}<br><span class="pp-dim">live orbital position</span>`)
+      .addTo(layers.iss);
+    L.circleMarker([s.lat, s.lon], { renderer: layers._canvas, radius: 26, color: "#7ad7ff", weight: 1, fillColor: "#7ad7ff", fillOpacity: .06 }).addTo(layers.iss);
+  }
+
+  // ---- NASA touch: NOAA space weather (Kp index → aurora chance) ----
+  async function spaceWx() {
+    const w = await SRC.spaceWx(http);
+    const badge = el.querySelector("#opsSpaceWx");
+    if (!badge || dead) return;
+    if (!w) { badge.textContent = ""; return; }
+    const cls = w.kp >= 5 ? "storm" : w.kp >= 4 ? "warn" : "";
+    badge.className = "ops-spacewx mono " + cls;
+    badge.innerHTML = `☀ Kp ${w.kp}${w.g ? " · " + w.g : ""} · aurora ${esc(w.aurora)}`;
   }
 
   save();

@@ -5,7 +5,8 @@
 //
 //   const N = window.TURD_NATIVE;  if(N){ ... }
 //
-//   N.platform                      "windows" | "android"
+//   N.platform                      "windows" | "android"  (the bridge kind; a Tauri host = "windows")
+//   N.os                            "windows" | "linux" | "android"  (the real OS)
 //   N.http(url, opts)               CORS-free fetch → Response (also window.TURD_HTTP)
 //   N.on(event, fn) → off()         "extras:progress" {id, received, total, line?, state}
 //                                   "server:log" {line}   (Windows chat host)
@@ -16,6 +17,8 @@
 //   N.radar.request()               asks for the scan permissions, → same shape
 //   N.radar.wifi()                  [{ssid, bssid, rssi, freq, channel, secure}]
 //   N.radar.ble({ms})               [{name, id, rssi}]   (scans for ms, default 6000)
+//   N.radar.adapters()              [{id, name, driver, chipset, bands, monitor, injection, up, mac}]  (null = unknown)
+//   N.radar.capabilities()          {platform, wifiScan, monitor, injection, ble, adapters, note?}
 //
 //   N.extras.info({dir?})           {dir, freeBytes, totalBytes, platform}
 //   N.extras.dirs()                 [{path, label, freeBytes, totalBytes, removable}]
@@ -121,8 +124,17 @@
     return res;
   }
 
+  // kind is the bridge ("windows" = any Tauri host, "android" = Capacitor). The real OS can
+  // differ (the Linux app is also a Tauri host), so derive it: Capacitor => android, else sniff
+  // the WebView user agent (webkit2gtk on Linux vs WebView2 on Windows). radar.capabilities()
+  // returns the authoritative platform from native code as well.
+  var realOs = (kind === "android") ? "android"
+             : (/\bLinux\b/i.test(navigator.userAgent || "") && !/\bWindows\b/i.test(navigator.userAgent || "")) ? "linux"
+             : "windows";
+
   var N = {
     platform: kind,
+    os: realOs,
     http: http,
     on: on,
     info: function(){ return call("info"); },
@@ -132,6 +144,8 @@
       request: function(){ return call("radarRequest"); },
       wifi: function(){ return call("wifiScan").then(items); },
       ble: function(o){ return call("bleScan", { ms: (o && o.ms) || 6000 }).then(items); },
+      adapters: function(){ return call("radarAdapters").then(items); },
+      capabilities: function(){ return call("radarCapabilities"); },
     },
     extras: {
       info: function(o){ return call("extrasInfo", o || {}); },

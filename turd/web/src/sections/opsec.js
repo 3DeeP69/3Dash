@@ -10,6 +10,7 @@ import { edgeFades } from "./util.js";
 import { mountMap } from "./ops/map.js";
 import { mountRecon } from "./ops/recon.js";
 import { mountNetHealth } from "./ops/nethealth.js";
+import { mountInsec } from "./ops/insec.js";
 import { mountRadar, unmountRadar } from "./radar.js";
 import { mountNetwatch, unmountNetwatch } from "./netwatch.js";
 
@@ -71,7 +72,12 @@ export default {
         mountRadar(r, ctx); mountNetwatch(n, ctx);
         cleanup = () => { try { unmountRadar(); } catch (e) {} try { unmountNetwatch(); } catch (e) {} };
       } else {
-        renderHarden(body, ctx);
+        // OPSEC tab = INSEC audit (reviews what the other tools found) + the hardening checklist
+        const ins = document.createElement("div"); ins.className = "spy-pane"; body.appendChild(ins);
+        const insClean = mountInsec(ins, ctx) || (() => {});
+        const h = document.createElement("div"); h.className = "spy-pane spy-pane-gap"; body.appendChild(h);
+        renderHarden(h, ctx);
+        cleanup = () => { try { insClean(); } catch (e) {} };
       }
     };
     el.querySelectorAll(".spy-tab").forEach(b => b.onclick = () => showTab(b.dataset.tab));
@@ -149,8 +155,11 @@ function renderHarden(body, ctx) {
   #opsMapStat{color:var(--accent)}
   .ops-map-legend{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.5px}
   .ops-map-legend .lg{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle}
-  .lg.air{background:#39d0ff}.lg.gov{background:#ffd23f}.lg.alpr{background:#ff3fb0}.lg.cam{background:#9a6bff}.lg.inc{background:#ff7a3f}
-  .ops-plane,.ops-govair{background:none;border:0}
+  .lg.air{background:#39d0ff}.lg.gov{background:#ffd23f}.lg.iss{background:#7ad7ff}.lg.alpr{background:#ff3fb0}.lg.cam{background:#9a6bff}.lg.inc{background:#ff7a3f}
+  .ops-plane,.ops-govair,.ops-iss{background:none;border:0}
+  .ops-iss{font-size:18px;line-height:20px;text-align:center;filter:drop-shadow(0 0 6px #7ad7ff)}
+  .ops-spacewx{font-size:11px;color:#8fd6ff;opacity:.85}
+  .ops-spacewx.warn{color:#ffd23f}.ops-spacewx.storm{color:#ff7a3f;font-weight:600}
   .ops-govair{font-size:15px;line-height:16px;color:#ffd23f;text-shadow:0 0 4px #000;text-align:center}
   .leaflet-popup-content{font-family:var(--font);font-size:13px;line-height:1.5}
   .leaflet-popup-content b{color:#0b1b2a}

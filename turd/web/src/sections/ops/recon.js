@@ -34,6 +34,11 @@ const demoScan = (host, ports) => ports.map(p => ({
   port: p, open: [80, 443, 22, 445, 8787, 8080].includes(p) && Math.random() > .3, service: SERVICES[p],
 })).filter(r => r.open || Math.random() > .97);
 
+// last scan, for the INSEC audit (its own-network risk read)
+let LAST = { host: "", open: [], scannedAt: 0 };
+export function getLastRecon() { return { host: LAST.host, scannedAt: LAST.scannedAt, open: LAST.open.slice() }; }
+export const SERVICE_FOR = p => SERVICES[p];
+
 export function mountRecon(el, ctx) {
   const { esc, toast, head, LS } = ctx;
   const N = window.TURD_NATIVE;
@@ -73,6 +78,7 @@ export function mountRecon(el, ctx) {
       }
     } catch (e) { state.textContent = "scan failed: " + String(e && e.message || e); go.disabled = false; return; }
     const open = rows.filter(r => r.open).sort((a, b) => a.port - b.port);
+    LAST = { host, scannedAt: Date.now(), open: open.map(r => ({ port: r.port, service: r.service || SERVICES[r.port], banner: r.banner })) };
     state.textContent = `${host} · ${open.length} open of ${ports.length} scanned · ${new Date().toLocaleTimeString([], { hour12: false })}`;
     out.innerHTML = open.length ? `<table class="rc-table"><thead><tr><th>port</th><th>service</th><th>detail</th></tr></thead><tbody>` +
       open.map(r => `<tr><td class="rc-p">${r.port}</td><td>${esc(r.service || SERVICES[r.port] || "—")}</td><td class="rc-d">${esc(r.banner || (r.port === 8787 ? "T.U.R.D. server" : ""))}</td></tr>`).join("") +

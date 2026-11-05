@@ -65,6 +65,8 @@ pub fn run() {
             radar::nat_wifi_scan,
             radar::nat_ble_scan,
             radar::nat_bt_batteries,
+            radar::nat_radar_adapters,
+            radar::nat_radar_capabilities,
             server::nat_server_status,
             server::nat_server_start,
             server::nat_server_stop,

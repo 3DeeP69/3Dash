@@ -116,6 +116,13 @@ const NETWATCH = {
   summary(){ return { title:"Network", value:DEVICES.length||"—", note:"devices" }; },
 };
 export default NETWATCH;
+// For the INSEC audit: the last scan's devices annotated with their known/trust state.
+export function getNetDevices(LS){
+  const s = LS ? store(LS) : { known:{} };
+  return DEVICES.map(d=>{ const id=idOf(d), k=s.known[id]||null;
+    return { ip:d.ip, mac:d.mac, vendor:d.vendor, hostname:d.hostname, self:!!d.self, gateway:!!d.gateway,
+      known:!!k, trusted:!!(k&&k.trust), name:(k&&k.name)||d.hostname||"" }; });
+}
 export function mountNetwatch(el, ctx){ return NETWATCH.mount(el, ctx); }
 export function unmountNetwatch(){ return NETWATCH.unmount && NETWATCH.unmount(); }
 

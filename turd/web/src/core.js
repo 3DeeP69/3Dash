@@ -19,8 +19,8 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
 /* ---- known section files (dynamic-imported; missing files are skipped) ---- */
-const SECTION_FILES = ["home","assistant","weather","projects","logbook","chat","opsec","entertainment","extras"]; // radar+netwatch fold into the Spy Tools (opsec) tab, no longer standalone sections
-const ORDER = ["home","assistant","weather","logbook","chat","opsec","entertainment","extras","projects"]; // Projects lands at the bottom of the rail
+const SECTION_FILES = ["home","assistant","weather","projects","logbook","chat","opsec","space","entertainment","extras"]; // radar+netwatch fold into the Spy Tools (opsec) tab, no longer standalone sections
+const ORDER = ["home","assistant","weather","logbook","chat","opsec","space","entertainment","extras","projects"]; // Projects lands at the bottom of the rail
 
 /* ------------------------------------------------------------- utilities */
 export const LS = {
@@ -71,17 +71,21 @@ function autoQuality(){ // defaults tuned to the owner's FLOOR hardware: Galaxy 
   try{ const mem=navigator.deviceMemory||4, cores=navigator.hardwareConcurrency||4,
     mobile=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent||""),
     fine=(typeof matchMedia!=="undefined" && matchMedia("(pointer:fine)").matches);
-    if(mem<=2||cores<=2) return "LOW";                         // very weak device
+    if(mem<=2||cores<=2) return "POTATO";                      // very weak device: no 3D at all
     if(fine && !mobile) return (mem>=8 && cores>=12) ? "HIGH" : "MED";  // desktop: MED unless clearly strong
     return (mobile||mem<=4||cores<=4) ? "MED" : "HIGH";        // phones/tablets incl. Fold4 → MED
   }catch(e){ return "MED"; } }
 let QUALITY_LOCKED=!!LS.get("turd_quality",null);           // operator picked a tier manually
-let QUALITY=LS.get("turd_quality",null)||autoQuality();     // otherwise auto-pick
-let frame=0, fpsAcc=0, fpsN=0, lastGov=0, lastFrameT=0, PR=1, baseFps=0;  // frame-governor state
+let QUALITY=LS.get("turd_quality",null)||LS.get("turd_quality_cache",null)||autoQuality();  // otherwise auto-pick (or what the governor learned here)
+let frame=0, fpsAcc=0, fpsN=0, lastGov=0, lastFrameT=0, PR=1, baseFps=0, slowN=0;  // frame-governor state
 // desktop (a real pointer) keeps the XMB wave lines crisp — never resample below 1x there;
 // phones can still drop to 0.75 under load. Fixes "everything is a bit blurry on PC".
 const PR_FLOOR=(typeof matchMedia!=="undefined" && matchMedia("(pointer:fine)").matches)?Math.min(devicePixelRatio||1,1):0.75;
-document.body.dataset.quality=QUALITY; document.body.classList.toggle("q-low",QUALITY==="LOW");
+// POTATO = no WebGL scene, flat 2D look (index.html body.q-potato); every section treats it as LOW
+function markQuality(){ const p=QUALITY==="POTATO"; document.body.dataset.quality=p?"LOW":QUALITY;
+  document.body.classList.toggle("q-low",QUALITY==="LOW"||p); document.body.classList.toggle("q-potato",p);
+  const pv=document.getElementById("perf-val"); if(pv) pv.textContent=QUALITY; }
+markQuality();
 const target={ color:new THREE.Color("#2f8cff") };   // console-blue base (XMB)
 const target2={ color:new THREE.Color("#0050d0") };  // secondary (wave depth layer)
 const mouse={ x:0, y:0 };
@@ -134,7 +138,7 @@ function disposeScene(){
 }
 function resize(){ renderer.setSize(innerWidth,innerHeight,false); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); }
 function animate(){ raf=requestAnimationFrame(animate); frame++;
-  if(window.TURD_IDLE && (frame%6)!==0) return;   // idle ambient mode: drop to ~10fps to spare the low-end PC + Fold battery
+  if(window.TURD_IDLE){ lastFrameT=0; fpsAcc=0; fpsN=0; if((frame%6)!==0) return; }  // idle ambient mode: ~10fps on purpose, so the governor must not read it as jank
   const t=performance.now()*0.001;
   WAVE_T.value=t;
   wave.material.color.lerp(target.color,0.05); waveB.material.color.lerp(target2.color,0.05);
@@ -147,11 +151,13 @@ function animate(){ raf=requestAnimationFrame(animate); frame++;
   // and power-saving), then act only on real jank — trim pixelRatio before dropping a whole tier.
   const now=performance.now();
   if(lastFrameT){ fpsAcc+=now-lastFrameT; if(++fpsN>=60){ const fps=1000/(fpsAcc/fpsN); fpsAcc=0; fpsN=0;
+    slowN=fps<20?slowN+1:0;                                   // two slow windows in a row = really slow, not one hiccup
     if(!baseFps){ baseFps=fps; }                              // first full window = baseline
-    else if(!QUALITY_LOCKED && now-lastGov>5000 && fps<baseFps*0.7 && fps<50){ lastGov=now;
-      if(PR>PR_FLOOR){ PR=Math.max(PR_FLOOR,+(PR-0.25).toFixed(2)); renderer.setPixelRatio(PR); renderer.setSize(innerWidth,innerHeight,false); }
-      else if(QUALITY!=="LOW"){ QUALITY=QUALITY==="HIGH"?"MED":"LOW"; document.body.dataset.quality=QUALITY; document.body.classList.toggle("q-low",QUALITY==="LOW");
-        const pv=$("#perf-val"); if(pv) pv.textContent=QUALITY; disposeScene(); initScene(); return; } } } }
+    else if(!QUALITY_LOCKED && now-lastGov>5000 && ((fps<baseFps*0.7 && fps<50) || slowN>=2)){ lastGov=now;
+      // under 20fps skip the gentle pixel trims and step a whole tier down
+      if(slowN<2 && PR>PR_FLOOR){ PR=Math.max(PR_FLOOR,+(PR-0.25).toFixed(2)); renderer.setPixelRatio(PR); renderer.setSize(innerWidth,innerHeight,false); }
+      else { QUALITY=QUALITY==="HIGH"?"MED":QUALITY==="MED"?"LOW":"POTATO"; LS.set("turd_quality_cache",QUALITY); markQuality(); disposeScene();
+        if(QUALITY==="POTATO") toast("slow machine · switched to POTATO mode"); else initScene(); return; } } } }
   lastFrameT=now;
 }
 
@@ -221,9 +227,10 @@ $("#brand").addEventListener("click",()=>{ brandClicks++; clearTimeout(brandTime
 addEventListener("keydown",e=>{ if(/^[a-z]$/i.test(e.key) && !e.target.closest?.("input,textarea,select,[contenteditable]")){ typed=(typed+e.key.toLowerCase()).slice(-6); if(typed.endsWith("audit")) openAudit(); } if(e.key==="Escape"){ $("#modal").classList.remove("show"); const bg=$("#byg"); if(bg) bg.classList.remove("show"); } });
 
 /* ------------------------------------------------------------- perf toggle */
-$("#perf").onclick=()=>{ const o=["HIGH","MED","LOW"]; QUALITY=o[(o.indexOf(QUALITY)+1)%3]; QUALITY_LOCKED=true; LS.set("turd_quality",QUALITY);
-  $("#perf-val").textContent=QUALITY; document.body.dataset.quality=QUALITY; document.body.classList.toggle("q-low",QUALITY==="LOW");
-  if(renderer){ disposeScene(); initScene(); } toast("render quality: "+QUALITY); };
+$("#perf").onclick=()=>{ const o=["HIGH","MED","LOW","POTATO"]; QUALITY=o[(o.indexOf(QUALITY)+1)%4]; QUALITY_LOCKED=true; LS.set("turd_quality",QUALITY);
+  markQuality(); if(renderer) disposeScene();
+  if(QUALITY!=="POTATO" && BOOTED && !document.body.classList.contains("no-scene")){ try{ initScene(); }catch(e){ renderer=null; } }
+  toast(QUALITY==="POTATO"?"render quality: POTATO · flat, no 3D, lightest possible":"render quality: "+QUALITY); };
 
 /* ------------------------------------------------------------- clock + boot */
 setInterval(()=>{ $("#st-clock").textContent=new Date().toLocaleTimeString([],{hour12:false}); },1000);
@@ -243,7 +250,7 @@ async function startApp(){
   import("./sync.js").then(m=>m.start&&m.start(SESSION)).catch(()=>{});
   // the 3D scene is decorative — if WebGL is unavailable it must not block the app booting
   // (sections, voice, nav). The body keeps its XMB gradient as the backdrop in that case.
-  if(!renderer){ try{ initScene(); }catch(e){ renderer=null; document.body.classList.add("no-scene"); console.warn("[TURD] 3D scene unavailable, continuing without it:",e); } }
+  if(!renderer && QUALITY!=="POTATO"){ try{ initScene(); }catch(e){ renderer=null; document.body.classList.add("no-scene"); console.warn("[TURD] 3D scene unavailable, continuing without it:",e); } }
   $("#perf-val").textContent=QUALITY;
   await loadSections();
   buildStage(); buildNav(); BOOTED=true; buildSessionTools();

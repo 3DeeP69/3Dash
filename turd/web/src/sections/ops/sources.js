@@ -203,3 +203,27 @@ export async function cameras(http, bbox) {
   }
   return [];
 }
+
+// NASA / space — keyless, public. ISS live ground position (wheretheiss.at) and NOAA
+// space-weather (planetary Kp index → geomagnetic storm / aurora chance). Both resolve
+// to null on any failure so the map never depends on them.
+export async function iss(http) {
+  try {
+    const d = await J(http, "https://api.wheretheiss.at/v1/satellites/25544");
+    const lat = num(d.latitude), lon = num(d.longitude);
+    if (lat == null || lon == null) return null;
+    return { lat, lon, alt: num(d.altitude), vel: num(d.velocity) };
+  } catch (e) { return null; }
+}
+export async function spaceWx(http) {
+  try {
+    const a = await J(http, "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json");
+    if (!Array.isArray(a) || a.length < 2) return null;
+    const last = a[a.length - 1];
+    const kp = parseFloat(last[1]);
+    if (!isFinite(kp)) return null;
+    const storm = kp >= 5;                        // Kp≥5 = geomagnetic storm (NOAA G1+)
+    const g = storm ? "G" + Math.min(5, Math.max(1, Math.round(kp - 4))) : null;
+    return { kp, storm, g, aurora: kp >= 5 ? "likely" : kp >= 4 ? "possible" : "quiet", at: last[0] };
+  } catch (e) { return null; }
+}

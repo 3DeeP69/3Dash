@@ -11,13 +11,13 @@
 // ===========================================================================
 (function(){
   "use strict";
-  var VERSION = "1.5.0";
+  var VERSION = "1.6.0";
   var DATE = "2026-11-05";
   var NOTES = [
-    "T.U.R.D. now runs on Linux: AppImage for any distro, plus a .deb for Debian/Ubuntu",
-    "Same app on Windows, Linux and Android, all at v1.5.0",
-    "From v1.4.0: controller moves through every section, clearer keyboard focus, offline Retry states",
-    "From v1.4.0: Fold cover and short-screen layout fixes; Weather 40–55% faster"
+    "New POTATO quality for very weak PCs and old phones: flat 2D, no 3D, blur, glow or animation — everything still works",
+    "Pick it under QUALITY (HIGH › MED › LOW › POTATO); a slow machine switches itself and remembers it",
+    "Fix: ambient mode no longer makes the app think the PC is struggling and drop quality",
+    "Cleaner look: easier-to-read sidebar labels, tidier pop-ups, one-row Logbook filters, project names and the Fold-cover event title fit"
   ];
 
   var info = { version: VERSION, web: VERSION, date: DATE, notes: NOTES, platform: "web" };

@@ -250,6 +250,228 @@ mod ble {
     }
 }
 
+/* ---------------------------------------------------------------- adapters & capabilities */
+// Cross-platform Wi-Fi adapter + capability reporting for the Spy Tools UI. Read-only;
+// reports whatever the OS exposes and leaves anything undeterminable as null so the UI can
+// render "unknown". Monitor mode / injection are only meaningfully detectable on Linux.
+
+#[tauri::command]
+pub async fn nat_radar_adapters(a: Value) -> Res {
+    let _ = a;
+    let items = tokio::task::spawn_blocking(adapters::list).await.map_err(|e| e.to_string())?;
+    Ok(json!({ "items": items }))
+}
+
+#[tauri::command]
+pub async fn nat_radar_capabilities(a: Value) -> Res {
+    let _ = a;
+    tokio::task::spawn_blocking(adapters::capabilities).await.map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "linux")]
+mod adapters {
+    use serde_json::{json, Value};
+    use std::fs;
+    use std::process::Command;
+
+    fn read_trim(p: &str) -> Option<String> {
+        fs::read_to_string(p).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+    }
+
+    // Wi-Fi interfaces: /sys/class/net/<if> entries that carry a `wireless` or `phy80211` node.
+    fn wifi_ifaces() -> Vec<String> {
+        let mut v = vec![];
+        if let Ok(rd) = fs::read_dir("/sys/class/net") {
+            for e in rd.flatten() {
+                let name = e.file_name().to_string_lossy().to_string();
+                let base = format!("/sys/class/net/{name}");
+                if fs::metadata(format!("{base}/wireless")).is_ok() || fs::metadata(format!("{base}/phy80211")).is_ok() {
+                    v.push(name);
+                }
+            }
+        }
+        v.sort();
+        v
+    }
+
+    fn driver_of(iface: &str) -> Option<String> {
+        fs::read_link(format!("/sys/class/net/{iface}/device/driver"))
+            .ok()
+            .and_then(|p| p.file_name().map(|s| s.to_string_lossy().to_string()))
+    }
+
+    fn iw_available() -> bool {
+        Command::new("iw").arg("--version").output().map(|o| o.status.success()).unwrap_or(false)
+    }
+
+    // `iw dev` -> (iface, phy) pairs.
+    fn iw_dev() -> Vec<(String, String)> {
+        let out = match Command::new("iw").arg("dev").output() {
+            Ok(o) if o.status.success() => o.stdout,
+            _ => return vec![],
+        };
+        let text = String::from_utf8_lossy(&out);
+        let mut res = vec![];
+        let mut cur_phy = String::new();
+        for line in text.lines() {
+            let t = line.trim();
+            if let Some(rest) = t.strip_prefix("phy#") {
+                cur_phy = format!("phy{}", rest.trim());
+            } else if let Some(rest) = t.strip_prefix("Interface ") {
+                res.push((rest.trim().to_string(), cur_phy.clone()));
+            }
+        }
+        res
+    }
+
+    // `iw phy <phy> info` -> (monitor supported, bands present).
+    fn phy_info(phy: &str) -> (Option<bool>, Option<Vec<String>>) {
+        let out = match Command::new("iw").arg("phy").arg(phy).arg("info").output() {
+            Ok(o) if o.status.success() => o.stdout,
+            _ => return (None, None),
+        };
+        let text = String::from_utf8_lossy(&out);
+        let mut monitor = Some(false);
+        let mut in_modes = false;
+        let mut bands: Vec<String> = vec![];
+        for line in text.lines() {
+            let t = line.trim();
+            if t.starts_with("Supported interface modes") {
+                in_modes = true;
+                continue;
+            }
+            if in_modes {
+                if t.starts_with('*') {
+                    if t.contains("monitor") { monitor = Some(true); }
+                } else if !t.is_empty() {
+                    in_modes = false;
+                }
+            }
+            if let Some(idx) = t.find(" MHz") {
+                let head = &t[..idx];
+                let numstr: String = head.chars().rev().take_while(|c| c.is_ascii_digit()).collect::<String>().chars().rev().collect();
+                if let Ok(mhz) = numstr.parse::<u32>() {
+                    let band = if (2400..2500).contains(&mhz) { "2.4" }
+                        else if (4900..5900).contains(&mhz) { "5" }
+                        else if (5925..7125).contains(&mhz) { "6" }
+                        else { "" };
+                    if !band.is_empty() && !bands.iter().any(|b| b == band) { bands.push(band.to_string()); }
+                }
+            }
+        }
+        bands.sort_by_key(|b| match b.as_str() { "2.4" => 0, "5" => 1, "6" => 2, _ => 9 });
+        (monitor, if bands.is_empty() { None } else { Some(bands) })
+    }
+
+    pub fn list() -> Vec<Value> {
+        let dev = if iw_available() { iw_dev() } else { vec![] };
+        let mut out = vec![];
+        for iface in wifi_ifaces() {
+            let base = format!("/sys/class/net/{iface}");
+            let mac = read_trim(&format!("{base}/address"));
+            let up = read_trim(&format!("{base}/operstate")).map(|s| s == "up").unwrap_or(false)
+                || read_trim(&format!("{base}/carrier")).map(|s| s == "1").unwrap_or(false);
+            let driver = driver_of(&iface);
+            let (monitor, bands) = match dev.iter().find(|(n, _)| *n == iface) {
+                Some((_, phy)) => phy_info(phy),
+                None => (None, None),
+            };
+            out.push(json!({
+                "id": iface, "name": iface, "driver": driver, "chipset": Value::Null,
+                "bands": bands, "monitor": monitor, "injection": Value::Null, "up": up, "mac": mac,
+            }));
+        }
+        out
+    }
+
+    pub fn capabilities() -> Value {
+        let ads = list();
+        let monitor = if ads.iter().any(|a| a.get("monitor") == Some(&json!(true))) { json!(true) }
+            else if ads.iter().all(|a| a.get("monitor").map(|m| m.is_null()).unwrap_or(true)) { Value::Null }
+            else { json!(false) };
+        json!({
+            "platform": "linux",
+            "wifiScan": false,
+            "monitor": monitor,
+            "injection": Value::Null,
+            "ble": false,
+            "adapters": ads.len(),
+            "note": if iw_available() { Value::Null } else { json!("install `iw` for adapter capabilities") },
+        })
+    }
+}
+
+#[cfg(windows)]
+mod adapters {
+    use crate::native::hidden;
+    use serde_json::{json, Value};
+    use std::process::Command;
+
+    // Best-effort parse of `netsh wlan show interfaces` (English labels). The Windows WLAN API
+    // does not expose monitor mode or packet injection to apps, so both are reported false.
+    pub fn list() -> Vec<Value> {
+        let mut cmd = Command::new("netsh");
+        cmd.args(["wlan", "show", "interfaces"]);
+        let out = match hidden(&mut cmd).output() {
+            Ok(o) if o.status.success() => o.stdout,
+            _ => return vec![],
+        };
+        let text = String::from_utf8_lossy(&out);
+        let mut out_v: Vec<Value> = vec![];
+        let mut cur: Option<(String, Option<String>, Option<String>, Vec<String>)> = None;
+        fn flush(v: &mut Vec<Value>, c: Option<(String, Option<String>, Option<String>, Vec<String>)>) {
+            if let Some((name, driver, mac, bands)) = c {
+                v.push(json!({
+                    "id": name, "name": name, "driver": driver, "chipset": Value::Null,
+                    "bands": if bands.is_empty() { Value::Null } else { json!(bands) },
+                    "monitor": false, "injection": false, "up": true, "mac": mac,
+                }));
+            }
+        }
+        for line in text.lines() {
+            if let Some((k, val)) = line.split_once(':') {
+                let key = k.trim().to_lowercase();
+                let val = val.trim().to_string();
+                match key.as_str() {
+                    "name" => { flush(&mut out_v, cur.take()); cur = Some((val, None, None, vec![])); }
+                    "description" => { if let Some(c) = cur.as_mut() { c.1 = Some(val); } }
+                    "physical address" => { if let Some(c) = cur.as_mut() { c.2 = Some(val); } }
+                    "radio type" | "band" => {
+                        if let Some(c) = cur.as_mut() {
+                            let low = val.to_lowercase();
+                            let add = |b: &mut Vec<String>, s: &str| { if !b.iter().any(|x| x == s) { b.push(s.to_string()); } };
+                            if low.contains("6 ghz") || low.contains("802.11be") { add(&mut c.3, "6"); }
+                            if low.contains("5 ghz") || low.contains("802.11a") || low.contains("802.11ac") || low.contains("802.11ax") { add(&mut c.3, "5"); }
+                            if low.contains("2.4") || low.contains("802.11b") || low.contains("802.11g") || low.contains("802.11n") { add(&mut c.3, "2.4"); }
+                            c.3.sort_by_key(|b| match b.as_str() { "2.4" => 0, "5" => 1, "6" => 2, _ => 9 });
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        flush(&mut out_v, cur.take());
+        out_v
+    }
+
+    pub fn capabilities() -> Value {
+        let ads = list();
+        json!({
+            "platform": "windows", "wifiScan": true, "monitor": false, "injection": false,
+            "ble": true, "adapters": ads.len(), "note": Value::Null,
+        })
+    }
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
+mod adapters {
+    use serde_json::{json, Value};
+    pub fn list() -> Vec<Value> { vec![] }
+    pub fn capabilities() -> Value {
+        json!({ "platform": "unknown", "wifiScan": false, "monitor": Value::Null, "injection": Value::Null, "ble": false, "adapters": 0 })
+    }
+}
+
 /* ---------------------------------------------------------------- bluetooth batteries */
 // Read-only battery level of already-paired Bluetooth devices (controller, earbuds, headset)
 // via the GATT Battery Service (0x180F / characteristic 0x2A19). No scan, no pairing, no prompt.
