@@ -14,6 +14,7 @@
   var VERSION = "1.6.0";
   var DATE = "2026-11-05";
   var NOTES = [
+    "New Space tab: NASA picture of the day, live ISS passes, tonight's sky, aurora odds, asteroids, Mars photos, launches",
     "New POTATO quality for very weak PCs and old phones: flat 2D, no 3D, blur, glow or animation — everything still works",
     "Pick it under QUALITY (HIGH › MED › LOW › POTATO); a slow machine switches itself and remembers it",
     "Fix: ambient mode no longer makes the app think the PC is struggling and drop quality",
