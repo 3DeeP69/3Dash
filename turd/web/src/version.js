@@ -14,10 +14,10 @@
   var VERSION = "1.5.0";
   var DATE = "2026-11-05";
   var NOTES = [
-    "Now downloadable for Linux — an AppImage that runs on any distro, plus a .deb",
-    "The Linux app bundles the same chat/assistant server as Windows; nothing else to install",
-    "Same T.U.R.D. everywhere now: Windows, Android and Linux",
-    "No app changes otherwise — this release adds the Linux download"
+    "T.U.R.D. now runs on Linux: AppImage for any distro, plus a .deb for Debian/Ubuntu",
+    "Same app on Windows, Linux and Android, all at v1.5.0",
+    "From v1.4.0: controller moves through every section, clearer keyboard focus, offline Retry states",
+    "From v1.4.0: Fold cover and short-screen layout fixes; Weather 40–55% faster"
   ];
 
   var info = { version: VERSION, web: VERSION, date: DATE, notes: NOTES, platform: "web" };
