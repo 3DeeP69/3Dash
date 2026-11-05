@@ -1,8 +1,8 @@
 # T.U.R.D. app builds. Lives at .github/workflows/build-apps.yml; the app sources are in
 # turd/ (turd/web, turd/server, turd/packaging/app), next to whatever else is in the repo.
 #
-# Produces: Windows setup .exe + .msi, Android release APK. Tag a commit "v1.2.3" to
-# also publish them as a GitHub Release.
+# Produces: Windows setup .exe + .msi, Android release APK, Linux .deb + .AppImage.
+# Tag a commit "v1.2.3" to also publish them as a GitHub Release.
 #
 # Signing (all optional; see packaging/app/SIGNING.md):
 #   ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
@@ -88,10 +88,42 @@ jobs:
         if: env.SKIP_APK != '1'
         with: { name: turd-android, path: "turd/packaging/app/TURD-*-android.apk" }
 
+  linux:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: turd/packaging/app } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22.22.0" }
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: "turd/packaging/app/src-tauri -> target" }
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update
+          # Tauri v2 on Linux: webkit2gtk-4.1 + gtk3 + appindicator + rsvg; patchelf + libfuse2 for AppImage
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2 file
+      - run: npm ci
+      - name: Version (tag, else turd/VERSION)
+        run: |
+          v="$(cat ../../VERSION)"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF_NAME#v}"; fi
+          node -e "const f='src-tauri/tauri.conf.json',c=require('./'+f);c.version='$v';require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
+      - run: node scripts/prepare-web.mjs ../../web
+      - run: node scripts/build-server-sea.mjs linux ../../server
+      - run: npx tauri build --bundles deb,appimage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: turd-linux
+          path: |
+            turd/packaging/app/src-tauri/target/release/bundle/deb/*.deb
+            turd/packaging/app/src-tauri/target/release/bundle/appimage/*.AppImage
+
   release:
-    # publishes whatever built: the Windows installers are required, the APK is optional
+    # publishes whatever built: the Windows installers are required, the APK + Linux are optional
     if: always() && startsWith(github.ref, 'refs/tags/v') && needs.windows.result == 'success'
-    needs: [windows, android]
+    needs: [windows, android, linux]
     runs-on: ubuntu-latest
     permissions: { contents: write }
     steps:

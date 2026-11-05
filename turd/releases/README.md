@@ -4,12 +4,12 @@ Newest first. Older versions stay here, marked superseded.
 
 | File | Current version | Where |
 |---|---|---|
-| Windows installer (.exe) | **v1.3.0** | `v1.3.0/TURD-1.3.0-windows-setup.exe` |
+| Windows installer (.exe) | **v1.4.0** | `v1.4.0/TURD-1.4.0-windows-setup.exe` |
 | Windows .msi | from GitHub CI | appears on the GitHub release once Bossman publishes it |
-| Fold4 APK | **v1.3.0** | `v1.3.0/TURD-1.3.0-android.apk` |
+| Fold4 APK | **v1.4.0** | `v1.4.0/TURD-1.4.0-android.apk` |
 | Desktop zip | retired after v1.1.0 | the installer runs its own server now |
 
-Superseded: v1.2.0, v1.1.0, v1.0.1 (desktop zip), v1.0.0. Full history in `CHANGELOG.md`.
+Superseded: v1.3.0, v1.2.0, v1.1.0, v1.0.1 (desktop zip), v1.0.0. Full history in `CHANGELOG.md`.
 On Bossman's PC: `D:\AI\T.U.R.D\Install` holds the current .exe + .apk; older ones go to `D:\AI\T.U.R.D\Older versions`.
 
 ## For the build threads

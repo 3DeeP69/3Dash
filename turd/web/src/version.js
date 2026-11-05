@@ -11,15 +11,13 @@
 // ===========================================================================
 (function(){
   "use strict";
-  var VERSION = "1.4.0";
-  var DATE = "2026-10-22";
+  var VERSION = "1.5.0";
+  var DATE = "2026-11-05";
   var NOTES = [
-    "Controller: D-pad or stick moves through every section (A select, B back, bumpers switch sections)",
-    "Clearer keyboard focus; Tab reaches the Home tiles and Projects cards, and never the hidden login",
-    "Offline: tiles and the Spy map say \"unavailable · Retry\" instead of spinning forever",
-    "Clearer mic messages: \"No microphone found\" / \"Mic is busy in another app\"",
-    "Short screens and Fold cover: tidier layout; nothing slides under the bars",
-    "Faster and lighter: Weather renders 40–55% quicker, and idle sections pause"
+    "Now downloadable for Linux — an AppImage that runs on any distro, plus a .deb",
+    "The Linux app bundles the same chat/assistant server as Windows; nothing else to install",
+    "Same T.U.R.D. everywhere now: Windows, Android and Linux",
+    "No app changes otherwise — this release adds the Linux download"
   ];
 
   var info = { version: VERSION, web: VERSION, date: DATE, notes: NOTES, platform: "web" };

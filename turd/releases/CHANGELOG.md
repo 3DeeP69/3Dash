@@ -7,9 +7,23 @@ To check which build you have: the version is shown under the login form and nex
 
 ---
 
-## Next (not built yet, planned as v1.4.0)
+## Next (not built yet)
 
-The deep polish pass is in the shared code and waiting for the next build:
+Nothing waiting yet.
+
+---
+
+## v1.4.0 (2026-10-22) · CURRENT
+
+Windows installer and Fold4 APK, both v1.4.0. This is the deep polish pass, focused on controller, keyboard, offline behavior, layout and speed.
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `TURD-1.4.0-windows-setup.exe` | 112 MB | `202e9605fea5…46fbb66` |
+| `TURD-1.4.0-android.apk` | 47 MB | `9c8434f7eb1e…a985b3` |
+
+Install over v1.3.0. Your accounts, logbook and chat stay. The APK is signed with the same key (checked: code 10400, cert 6fc5df18…), so the Fold updates in place.
+
 - **Controller everywhere:** the D-pad or left stick now moves through the buttons inside every section. A selects, B goes back, and LB/RB switch sections. The focused control glows, a hint bar shows the buttons, and it keeps its place when a section refreshes.
 - **Keyboard:** Tab no longer wanders into the hidden login screen, and the focus rings are clearer. The Home Weather and Projects tiles and the Projects cards can all be reached with Tab, Enter or the controller.
 - **Offline:** the Home weather and projects tiles say "unavailable · Retry" instead of spinning forever. The Spy Tools map says "Map tiles can't load right now", with Retry.
@@ -20,9 +34,12 @@ The deep polish pass is in the shared code and waiting for the next build:
   - On the Fold cover, the briefing row is tidier, calendar cards stay inside their edges, and sideways rows fade at the edge to show there's more.
 - **Faster:** animations pause in sections you aren't looking at, and Weather draws 40–55% faster. Memory stays flat over long use.
 
+**Known**
+- Windows still says "Windows protected your PC" because the installer isn't code-signed. Click More info, then Run anyway.
+
 ---
 
-## v1.3.0 (2026-10-22) · CURRENT
+## v1.3.0 (2026-10-22) · SUPERSEDED by v1.4.0
 
 Windows installer and Fold4 APK, both v1.3.0. This is the "damn near perfection" pass.
 
@@ -57,7 +74,7 @@ Install over v1.2.0. Your accounts, logbook and chat stay. The APK is signed wit
 
 ---
 
-## v1.2.0 (2026-10-22) · SUPERSEDED by v1.3.0
+## v1.2.0 (2026-10-22) · SUPERSEDED by v1.4.0
 
 Windows installer and Fold4 APK, both v1.2.0. There is no desktop zip anymore: the installer is the app.
 
@@ -92,7 +109,7 @@ Install over v1.1.0. Your accounts, logbook and chat stay. The APK is signed wit
 
 ---
 
-## v1.1.0 (2026-10-21) · SUPERSEDED by v1.3.0
+## v1.1.0 (2026-10-21) · SUPERSEDED by v1.4.0
 
 Windows installer, Fold4 APK and desktop zip, all v1.1.0.
 
@@ -131,7 +148,7 @@ Install over the old version. Your accounts, logbook and chat stay. The APK is s
 
 ---
 
-## v1.0.1 (2026-10-21) · desktop folder build · SUPERSEDED by v1.3.0
+## v1.0.1 (2026-10-21) · desktop folder build · SUPERSEDED by v1.4.0
 
 Only the desktop zip changed. The Windows installer and Fold4 APK are still v1.0.0 until v1.1.0.
 
@@ -154,7 +171,7 @@ How to use: unzip, then double-click `start-windows.bat` (needs Node.js). Your o
 
 ---
 
-## v1.0.0 (2026-10-21) · SUPERSEDED by v1.3.0
+## v1.0.0 (2026-10-21) · SUPERSEDED by v1.4.0
 
 First native builds.
 
